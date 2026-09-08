@@ -1,124 +1,292 @@
-import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ExternalLink } from '@/components/external-link';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Collapsible } from '@/components/ui/collapsible';
 import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useEnergyMeter } from '@/hooks/useEnergyMeter';
 import { useTheme } from '@/hooks/use-theme';
 
-export default function TabTwoScreen() {
+export default function ExploreScreen() {
   const safeAreaInsets = useSafeAreaInsets();
+  const theme = useTheme();
+
+  const {
+    status,
+    ipAddress,
+    isMockMode,
+    updateConfig,
+    resetEnergy,
+  } = useEnergyMeter();
+
+  const [load1, setLoad1] = useState(String(status?.load1_watts ?? 60));
+  const [load2, setLoad2] = useState(String(status?.load2_watts ?? 1200));
+  const [voltage, setVoltage] = useState(String(status?.voltage ?? 230));
+  const [tariff, setTariff] = useState(String(status?.tariff_rate ?? 8));
+  const [delaySec, setDelaySec] = useState(String(status?.auto_off_delay_sec ?? 180));
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
   const insets = {
     ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
+    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.four,
   };
-  const theme = useTheme();
 
   const contentPlatformStyle = Platform.select({
     android: {
-      paddingTop: insets.top,
+      paddingTop: insets.top + Spacing.two,
       paddingLeft: insets.left,
       paddingRight: insets.right,
       paddingBottom: insets.bottom,
     },
     web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
+      paddingTop: Spacing.four,
+      paddingBottom: Spacing.six,
+    },
+    default: {
+      paddingTop: insets.top,
+      paddingBottom: insets.bottom,
     },
   });
+
+  const handleSaveConfig = async () => {
+    const l1 = parseFloat(load1);
+    const l2 = parseFloat(load2);
+    const v = parseFloat(voltage);
+    const t = parseFloat(tariff);
+    const d = parseInt(delaySec, 10);
+
+    if (isNaN(l1) || isNaN(l2) || isNaN(v) || isNaN(t) || isNaN(d)) {
+      if (Platform.OS === 'web') {
+        window.alert('Please enter valid numeric values');
+      } else {
+        Alert.alert('Invalid Input', 'Please enter valid numeric values');
+      }
+      return;
+    }
+
+    const ok = await updateConfig({
+      load1_watts: l1,
+      load2_watts: l2,
+      grid_voltage: v,
+      tariff_rate: t,
+      auto_off_delay_sec: d,
+    });
+
+    if (ok) {
+      setSaveStatus('✓ Settings saved to ESP32 Flash!');
+      setTimeout(() => setSaveStatus(null), 3000);
+    } else {
+      setSaveStatus('❌ Failed to update settings');
+    }
+  };
+
+  const handleReset = async () => {
+    const confirmAction = async () => {
+      await resetEnergy();
+      if (Platform.OS === 'web') {
+        window.alert('Cumulative energy reset to 0 kWh');
+      } else {
+        Alert.alert('Reset Complete', 'Cumulative energy has been reset to 0 kWh');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Reset cumulative energy counter to 0.0 kWh?')) {
+        await confirmAction();
+      }
+    } else {
+      Alert.alert(
+        'Reset Energy Counter',
+        'Are you sure you want to reset accumulated kWh to 0.0000?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Reset', style: 'destructive', onPress: confirmAction },
+        ]
+      );
+    }
+  };
 
   return (
     <ScrollView
       style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
+      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}
+      showsVerticalScrollIndicator={false}>
       <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
+        {/* Header */}
+        <View style={styles.titleContainer}>
+          <ThemedText type="subtitle">⚙️ Device & Hardware Setup</ThemedText>
           <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
+            Wiring Reference, Power Calibration & System Diagnostics
+          </ThemedText>
+        </View>
+
+        {/* 1. Hardware Pinout Reference */}
+        <Collapsible title="🔌 Hardware Wiring Reference">
+          <ThemedView type="backgroundElement" style={styles.innerBox}>
+            <ThemedText type="smallBold" style={{ color: '#0284C7' }}>
+              Your Connected ESP32 Pinout:
+            </ThemedText>
+
+            <View style={styles.pinRow}>
+              <ThemedText type="smallBold">1. IR Sensor:</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                DO → <ThemedText type="code">GPIO 26</ThemedText> | VCC → 3V3 | GND → GND
+              </ThemedText>
+            </View>
+
+            <View style={styles.pinRow}>
+              <ThemedText type="smallBold">2. PIR Sensor:</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                OUT → <ThemedText type="code">GPIO 27</ThemedText> | VCC → VIN/5V | GND → GND
+              </ThemedText>
+            </View>
+
+            <View style={styles.pinRow}>
+              <ThemedText type="smallBold">3. HC-SR04 Ultrasonic:</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                TRIG → <ThemedText type="code">GPIO 5</ThemedText> | ECHO → <ThemedText type="code">GPIO 18</ThemedText> (via 1k/2k divider)
+              </ThemedText>
+            </View>
+
+            <View style={styles.pinRow}>
+              <ThemedText type="smallBold">4. Relays (Dual Channel):</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                IN1 (Load 1) → <ThemedText type="code">GPIO 25</ThemedText> | IN2 (Load 2) → <ThemedText type="code">GPIO 33</ThemedText>
+              </ThemedText>
+            </View>
+
+            <View style={styles.divider} />
+            <ThemedText type="small" style={{ fontStyle: 'italic', color: '#F59E0B' }}>
+              ⚠️ Voltage Divider for Echo: 1kΩ resistor from HC-SR04 ECHO to GPIO 18, and 2kΩ from GPIO 18 to GND to step 5V down to ~3.3V safely.
+            </ThemedText>
+          </ThemedView>
+        </Collapsible>
+
+        {/* 2. Appliance & Energy Calibration */}
+        <ThemedView type="backgroundElement" style={styles.sectionCard}>
+          <ThemedText type="smallBold" style={styles.sectionHeading}>
+            ⚡ APPLIANCE POWER & TARIFF CONFIGURATION
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Set rated wattage for connected loads to ensure accurate kWh accumulation.
           </ThemedText>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
-
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
+          <View style={styles.inputGrid}>
+            <View style={styles.inputGroup}>
+              <ThemedText type="smallBold">Load 1 Rating (Watts)</ThemedText>
+              <TextInput
+                style={[styles.input, { color: theme.text, backgroundColor: theme.background }]}
+                keyboardType="numeric"
+                value={load1}
+                onChangeText={setLoad1}
+                placeholder="60"
               />
-            </ThemedView>
-          </Collapsible>
+            </View>
 
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+            <View style={styles.inputGroup}>
+              <ThemedText type="smallBold">Load 2 Rating (Watts)</ThemedText>
+              <TextInput
+                style={[styles.input, { color: theme.text, backgroundColor: theme.background }]}
+                keyboardType="numeric"
+                value={load2}
+                onChangeText={setLoad2}
+                placeholder="1200"
+              />
+            </View>
 
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+            <View style={styles.inputGroup}>
+              <ThemedText type="smallBold">Grid Voltage (V)</ThemedText>
+              <TextInput
+                style={[styles.input, { color: theme.text, backgroundColor: theme.background }]}
+                keyboardType="numeric"
+                value={voltage}
+                onChangeText={setVoltage}
+                placeholder="230"
+              />
+            </View>
 
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
+            <View style={styles.inputGroup}>
+              <ThemedText type="smallBold">Tariff Rate (₹ per kWh)</ThemedText>
+              <TextInput
+                style={[styles.input, { color: theme.text, backgroundColor: theme.background }]}
+                keyboardType="numeric"
+                value={tariff}
+                onChangeText={setTariff}
+                placeholder="8.0"
+              />
+            </View>
+
+            <View style={styles.inputGroupFull}>
+              <ThemedText type="smallBold">Auto-Off Vacancy Delay (Seconds)</ThemedText>
+              <TextInput
+                style={[styles.input, { color: theme.text, backgroundColor: theme.background }]}
+                keyboardType="numeric"
+                value={delaySec}
+                onChangeText={setDelaySec}
+                placeholder="180"
+              />
+            </View>
+          </View>
+
+          {saveStatus && (
+            <ThemedText
+              type="smallBold"
+              style={{ color: saveStatus.startsWith('✓') ? '#10B981' : '#EF4444' }}>
+              {saveStatus}
             </ThemedText>
-          </Collapsible>
+          )}
+
+          <Pressable
+            style={({ pressed }) => [styles.saveBtn, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={handleSaveConfig}>
+            <ThemedText style={styles.saveBtnText}>Save Calibration to ESP32</ThemedText>
+          </Pressable>
         </ThemedView>
+
+        {/* 3. Energy Counter Reset */}
+        <ThemedView type="backgroundElement" style={styles.sectionCard}>
+          <ThemedText type="smallBold" style={{ color: '#EF4444' }}>
+            🗑️ RESET ENERGY COUNTER
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Zero out accumulated kilowatt-hours (kWh) and cost for a new billing cycle.
+          </ThemedText>
+
+          <Pressable
+            style={({ pressed }) => [styles.resetBtn, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={handleReset}>
+            <ThemedText style={styles.resetBtnText}>Reset Energy Meter to 0.0 kWh</ThemedText>
+          </Pressable>
+        </ThemedView>
+
+        {/* 4. Live Diagnostics / Raw JSON Viewer */}
+        <Collapsible title="📊 Raw ESP32 JSON Diagnostics">
+          <ThemedView type="backgroundElement" style={styles.innerBox}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Endpoint: <ThemedText type="code">http://{ipAddress}/api/status</ThemedText>
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Mode: {isMockMode ? 'Simulated Offline Demo' : 'Live ESP32 Device'}
+            </ThemedText>
+            <View style={[styles.codeBox, { backgroundColor: theme.background }]}>
+              <ThemedText type="code" style={styles.codeText}>
+                {status ? JSON.stringify(status, null, 2) : 'No data received'}
+              </ThemedText>
+            </View>
+          </ThemedView>
+        </Collapsible>
+
         {Platform.OS === 'web' && <WebBadge />}
       </ThemedView>
     </ScrollView>
@@ -136,45 +304,91 @@ const styles = StyleSheet.create({
   container: {
     maxWidth: MaxContentWidth,
     flexGrow: 1,
+    paddingHorizontal: Spacing.four,
+    gap: Spacing.four,
   },
   titleContainer: {
-    gap: Spacing.three,
+    gap: Spacing.one,
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
+    paddingVertical: Spacing.three,
   },
   centerText: {
     textAlign: 'center',
   },
-  pressed: {
-    opacity: 0.7,
+  innerBox: {
+    padding: Spacing.three,
+    borderRadius: Spacing.two,
+    gap: Spacing.two,
   },
-  linkButton: {
+  pinRow: {
+    gap: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(150, 150, 150, 0.2)',
+    marginVertical: Spacing.one,
+  },
+  sectionCard: {
+    borderRadius: Spacing.four,
+    padding: Spacing.four,
+    gap: Spacing.three,
+  },
+  sectionHeading: {
+    color: '#0284C7',
+    letterSpacing: 0.5,
+  },
+  inputGrid: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-    justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
   },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
+  inputGroup: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    gap: 4,
   },
-  collapsibleContent: {
-    alignItems: 'center',
-  },
-  imageTutorial: {
+  inputGroupFull: {
     width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
+    gap: 4,
   },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
+  input: {
+    height: 42,
+    borderWidth: 1,
+    borderColor: 'rgba(150, 150, 150, 0.3)',
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    fontSize: 14,
+  },
+  saveBtn: {
+    backgroundColor: '#0284C7',
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  resetBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+  },
+  resetBtnText: {
+    color: '#EF4444',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  codeBox: {
+    padding: Spacing.three,
+    borderRadius: Spacing.two,
+    maxHeight: 250,
+  },
+  codeText: {
+    fontSize: 11,
   },
 });

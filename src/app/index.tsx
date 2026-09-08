@@ -1,98 +1,165 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React from 'react';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { ConnectionBar } from '@/components/energy/ConnectionBar';
+import { PowerOverviewCard } from '@/components/energy/PowerOverviewCard';
+import { RelayControlSection } from '@/components/energy/RelayControlSection';
+import { SensorTelemetryGrid } from '@/components/energy/SensorTelemetryGrid';
+import { SmartEcoBanner } from '@/components/energy/SmartEcoBanner';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+import { useEnergyMeter } from '@/hooks/useEnergyMeter';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function HomeScreen() {
+  const safeAreaInsets = useSafeAreaInsets();
+  const theme = useTheme();
+
+  const {
+    status,
+    ipAddress,
+    setIpAddress,
+    isConnected,
+    isMockMode,
+    setIsMockMode,
+    isLoading,
+    refresh,
+    toggleRelay,
+    toggleAutoMode,
+  } = useEnergyMeter();
+
+  const insets = {
+    ...safeAreaInsets,
+    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.four,
+  };
+
+  const contentPlatformStyle = Platform.select({
+    android: {
+      paddingTop: insets.top + Spacing.two,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
+      paddingBottom: insets.bottom,
+    },
+    web: {
+      paddingTop: Spacing.four,
+      paddingBottom: Spacing.six,
+    },
+    default: {
+      paddingTop: insets.top,
+      paddingBottom: insets.bottom,
+    },
+  });
+
+  const powerWatts = status?.power_watts ?? 0;
+  const totalKwh = status?.total_kwh ?? 0;
+  const costEstimate = status?.cost_estimate ?? 0;
+  const voltage = status?.voltage ?? 230;
+  const currentAmps = status?.current_amps ?? 0;
+  const tariffRate = status?.tariff_rate ?? 8;
+  const relay1 = status?.relay1 ?? false;
+  const relay2 = status?.relay2 ?? false;
+  const load1Watts = status?.load1_watts ?? 60;
+  const load2Watts = status?.load2_watts ?? 1200;
+  const pirMotion = status?.pir_motion ?? false;
+  const irDetected = status?.ir_detected ?? false;
+  const distanceCm = status?.distance_cm ?? 0;
+  const autoMode = status?.auto_mode ?? true;
+  const idleSec = status?.idle_sec ?? 0;
+  const autoCutoffCountdownSec = status?.auto_cutoff_countdown_sec ?? 0;
+  const autoOffDelaySec = status?.auto_off_delay_sec ?? 180;
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <ScrollView
+      style={[styles.scrollView, { backgroundColor: theme.background }]}
+      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}
+      showsVerticalScrollIndicator={false}>
+      <ThemedView style={styles.container}>
+        {/* App Title Bar */}
+        <View style={styles.header}>
+          <View>
+            <ThemedText type="title" style={styles.appTitle}>
+              ⚡ Energy Meter
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              ESP32 Smart Telemetry & Relay Automation
+            </ThemedText>
+          </View>
+        </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        {/* 1. Connection & IP Bar */}
+        <ConnectionBar
+          ipAddress={ipAddress}
+          onIpChange={setIpAddress}
+          isConnected={isConnected}
+          isMockMode={isMockMode}
+          onToggleMockMode={setIsMockMode}
+          onRefresh={refresh}
+          isLoading={isLoading}
+        />
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        {/* 2. Real-Time Power & Energy Overview */}
+        <PowerOverviewCard
+          powerWatts={powerWatts}
+          totalKwh={totalKwh}
+          costEstimate={costEstimate}
+          voltage={voltage}
+          currentAmps={currentAmps}
+          tariffRate={tariffRate}
+        />
+
+        {/* 3. Dual Relay Control */}
+        <RelayControlSection
+          relay1={relay1}
+          relay2={relay2}
+          load1Watts={load1Watts}
+          load2Watts={load2Watts}
+          onToggleRelay={toggleRelay}
+        />
+
+        {/* 4. Hardware Sensors Telemetry (IR, PIR, Ultrasonic) */}
+        <SensorTelemetryGrid
+          pirMotion={pirMotion}
+          irDetected={irDetected}
+          distanceCm={distanceCm}
+        />
+
+        {/* 5. Smart Eco Auto-Cutoff Mode */}
+        <SmartEcoBanner
+          autoMode={autoMode}
+          onToggleAutoMode={toggleAutoMode}
+          idleSec={idleSec}
+          autoCutoffCountdownSec={autoCutoffCountdownSec}
+          autoOffDelaySec={autoOffDelaySec}
+          isRelayActive={relay1 || relay2}
+        />
 
         {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollView: {
     flex: 1,
-    justifyContent: 'center',
+  },
+  contentContainer: {
     flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+  },
+  container: {
+    maxWidth: MaxContentWidth,
+    flexGrow: 1,
     paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
     gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  },
+  header: {
+    paddingVertical: Spacing.two,
+  },
+  appTitle: {
+    letterSpacing: -0.5,
   },
 });
