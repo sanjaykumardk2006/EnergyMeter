@@ -24,16 +24,8 @@
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 
-// -----------------------------------------------------------------------------
-// USER CONFIGURATION (Change WiFi credentials to match your network)
-// -----------------------------------------------------------------------------
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
-
-// Fallback SoftAP credentials (if home WiFi is not connected)
-const char* AP_SSID       = "EnergyMeter-AP";
-const char* AP_PASS       = "12345678";
 
 // -----------------------------------------------------------------------------
 // PIN DEFINITIONS (User Hardware Configuration)
@@ -357,30 +349,22 @@ void setup() {
   loadEnergyFromFlash();
   Serial.printf("Loaded saved energy: %.4f kWh\n", cumulative_kwh);
 
-  // Connect to WiFi
-  Serial.print("Connecting to WiFi: ");
-  Serial.println(WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  // Connect to WiFi using WiFiManager
+  Serial.println("Initializing WiFiManager...");
+  WiFiManager wm;
+  
+  // wm.resetSettings(); // Un-comment to reset saved WiFi credentials for testing
+  
+  // Start the captive portal AP with a custom name and password
+  bool res = wm.autoConnect("EnergyMeter-Setup", "12345678"); 
 
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n WiFi Connected!");
+  if(!res) {
+    Serial.println("\n❌ Failed to connect or hit timeout");
+    // ESP.restart();
+  } else {
+    Serial.println("\n✅ WiFi Connected!");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n❌ WiFi connection failed. Starting SoftAP fallback...");
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(AP_SSID, AP_PASS);
-    Serial.print("SoftAP IP Address: ");
-    Serial.println(WiFi.softAPIP());
-    Serial.printf("Connect phone to SSID '%s' (password: %s)\n", AP_SSID, AP_PASS);
   }
 
   // Setup mDNS (http://energymeter.local)
