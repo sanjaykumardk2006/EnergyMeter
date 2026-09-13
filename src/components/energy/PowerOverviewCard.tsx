@@ -173,11 +173,13 @@ const styles = StyleSheet.create({
   },
   metricsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.two,
     marginTop: Spacing.one,
   },
   metricCard: {
     flex: 1,
+    minWidth: 120,
     padding: Spacing.three,
     borderRadius: Spacing.three,
     gap: 4,

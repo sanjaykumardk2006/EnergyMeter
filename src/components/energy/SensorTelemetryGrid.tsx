@@ -195,10 +195,12 @@ const styles = StyleSheet.create({
   },
   sensorGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.two,
   },
   sensorCard: {
     flex: 1,
+    minWidth: 90,
     padding: Spacing.two,
     borderRadius: Spacing.three,
     gap: 4,

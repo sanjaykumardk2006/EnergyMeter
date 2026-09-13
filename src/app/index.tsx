@@ -151,6 +151,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   container: {
+    width: '100%',
     maxWidth: MaxContentWidth,
     flexGrow: 1,
     paddingHorizontal: Spacing.four,

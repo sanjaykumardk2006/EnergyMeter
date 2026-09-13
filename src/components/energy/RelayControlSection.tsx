@@ -147,10 +147,12 @@ const styles = StyleSheet.create({
   },
   cardsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.two,
   },
   relayCard: {
     flex: 1,
+    minWidth: 140,
     padding: Spacing.three,
     borderRadius: Spacing.three,
     borderWidth: 1.5,
