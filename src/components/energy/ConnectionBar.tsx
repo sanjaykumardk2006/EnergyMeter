@@ -53,7 +53,7 @@ export function ConnectionBar({
           <ThemedText style={[styles.statusText, { color: statusColor }]}>
             {statusLabel}
           </ThemedText>
-          <ThemedText style={styles.deviceLabel} themeColor="textSecondary">
+          <ThemedText style={styles.deviceLabel} themeColor="textSecondary" numberOfLines={1} ellipsizeMode="tail">
             {isMockMode ? 'Demo Mode' : ipAddress}
           </ThemedText>
         </View>
@@ -149,6 +149,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
+    flex: 1,
   },
   statusDot: {
     width: 10,
@@ -163,6 +164,7 @@ const styles = StyleSheet.create({
   deviceLabel: {
     fontSize: 12,
     marginLeft: Spacing.one,
+    flexShrink: 1,
   },
   actionGroup: {
     flexDirection: 'row',

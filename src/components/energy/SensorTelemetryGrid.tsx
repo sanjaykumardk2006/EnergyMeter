@@ -28,7 +28,7 @@ export function SensorTelemetryGrid({
     <ThemedView type="backgroundElement" style={styles.container}>
       {/* Header */}
       <View style={styles.headerRow}>
-        <View>
+        <View style={{ flex: 1, paddingRight: 8 }}>
           <ThemedText type="smallBold" style={styles.sectionTitle}>
             HARDWARE SENSORS & OCCUPANCY
           </ThemedText>
