@@ -65,15 +65,9 @@ export function RelayControlSection({
           <View style={styles.cardBody}>
             <ThemedText style={styles.applianceIcon}>💡</ThemedText>
             <ThemedText type="smallBold">Relay 1 (Load 1)</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Lights / Fan
-            </ThemedText>
           </View>
 
           <View style={styles.cardFooter}>
-            <View style={styles.wattBadge}>
-              <ThemedText style={styles.wattText}>{load1Watts.toFixed(0)} W</ThemedText>
-            </View>
             <ThemedText
               type="smallBold"
               style={{ color: relay1 ? '#10B981' : theme.textSecondary }}>
@@ -108,15 +102,9 @@ export function RelayControlSection({
           <View style={styles.cardBody}>
             <ThemedText style={styles.applianceIcon}>❄️</ThemedText>
             <ThemedText type="smallBold">Relay 2 (Load 2)</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              AC / Socket Load
-            </ThemedText>
           </View>
 
           <View style={styles.cardFooter}>
-            <View style={styles.wattBadge}>
-              <ThemedText style={styles.wattText}>{load2Watts.toFixed(0)} W</ThemedText>
-            </View>
             <ThemedText
               type="smallBold"
               style={{ color: relay2 ? '#F59E0B' : theme.textSecondary }}>

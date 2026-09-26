@@ -6,7 +6,6 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
   const [ipAddress, setIpAddress] = useState<string>(defaultIp);
   const [status, setStatus] = useState<EnergyMeterStatus | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [isMockMode, setIsMockMode] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -15,19 +14,18 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
 
   const fetchLatest = useCallback(async () => {
     try {
-      const { data, isMock } = await EnergyMeterService.getStatus(ipAddress, isMockMode);
+      const { data } = await EnergyMeterService.getStatus(ipAddress);
       setStatus(data);
       setIsConnected(true);
-      setIsMockMode(isMock);
       setLastUpdated(new Date());
       setErrorMsg(null);
     } catch (err: any) {
       setIsConnected(false);
-      setErrorMsg(`Cannot connect to ESP32 at ${ipAddress}. Enable Mock Mode to test.`);
+      setErrorMsg(`Cannot connect to ESP32 at ${ipAddress}. Please check IP Address.`);
     } finally {
       setIsLoading(false);
     }
-  }, [ipAddress, isMockMode]);
+  }, [ipAddress]);
 
   // Polling loop
   useEffect(() => {
@@ -57,7 +55,7 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
       [relayId === 1 ? 'relay1' : 'relay2']: newState,
     } : null));
 
-    const ok = await EnergyMeterService.setRelay(ipAddress, relayId, newState, isMockMode);
+    const ok = await EnergyMeterService.setRelay(ipAddress, relayId, newState);
     if (!ok) {
       // Revert if failed
       setStatus((prev) => (prev ? {
@@ -74,7 +72,7 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
     const newState = !status.auto_mode;
 
     setStatus((prev) => (prev ? { ...prev, auto_mode: newState } : null));
-    const ok = await EnergyMeterService.setAutoMode(ipAddress, newState, isMockMode);
+    const ok = await EnergyMeterService.setAutoMode(ipAddress, newState);
     if (!ok) {
       setStatus((prev) => (prev ? { ...prev, auto_mode: !newState } : null));
     } else {
@@ -83,7 +81,7 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
   };
 
   const updateConfig = async (config: Partial<EnergyMeterConfig>) => {
-    const ok = await EnergyMeterService.updateConfig(ipAddress, config, isMockMode);
+    const ok = await EnergyMeterService.updateConfig(ipAddress, config);
     if (ok) {
       setTimeout(fetchLatest, 400);
     }
@@ -91,7 +89,7 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
   };
 
   const resetEnergy = async () => {
-    const ok = await EnergyMeterService.resetEnergy(ipAddress, isMockMode);
+    const ok = await EnergyMeterService.resetEnergy(ipAddress);
     if (ok) {
       setTimeout(fetchLatest, 300);
     }
@@ -103,8 +101,6 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
     ipAddress,
     setIpAddress,
     isConnected,
-    isMockMode,
-    setIsMockMode,
     isLoading,
     lastUpdated,
     errorMsg,

@@ -9,8 +9,6 @@ interface Props {
   ipAddress: string;
   onIpChange: (ip: string) => void;
   isConnected: boolean;
-  isMockMode: boolean;
-  onToggleMockMode: (val: boolean) => void;
   onRefresh: () => void;
   isLoading: boolean;
 }
@@ -19,8 +17,6 @@ export function ConnectionBar({
   ipAddress,
   onIpChange,
   isConnected,
-  isMockMode,
-  onToggleMockMode,
   onRefresh,
   isLoading,
 }: Props) {
@@ -33,15 +29,11 @@ export function ConnectionBar({
     setIsEditing(false);
   };
 
-  const statusColor = isMockMode
-    ? '#F59E0B' // Amber for Simulated
-    : isConnected
+  const statusColor = isConnected
     ? '#10B981' // Green for Connected
     : '#EF4444'; // Red for Offline
 
-  const statusLabel = isMockMode
-    ? 'SIMULATED'
-    : isConnected
+  const statusLabel = isConnected
     ? 'CONNECTED'
     : 'OFFLINE';
 
@@ -54,7 +46,7 @@ export function ConnectionBar({
             {statusLabel}
           </ThemedText>
           <ThemedText style={styles.deviceLabel} themeColor="textSecondary" numberOfLines={1} ellipsizeMode="tail">
-            {isMockMode ? 'Demo Mode' : ipAddress}
+            {ipAddress}
           </ThemedText>
         </View>
 
@@ -79,24 +71,6 @@ export function ConnectionBar({
             onPress={() => setIsEditing(!isEditing)}>
             <ThemedText style={styles.btnText}>⚙️ IP</ThemedText>
           </Pressable>
-        </View>
-      </View>
-
-      {/* Mock Mode switch */}
-      <View style={styles.mockRow}>
-        <ThemedText type="small" themeColor="textSecondary">
-          Hardware not plugged in? Use Demo Mode:
-        </ThemedText>
-        <View style={styles.mockSwitch}>
-          <ThemedText type="smallBold" style={{ color: isMockMode ? '#F59E0B' : theme.textSecondary }}>
-            {isMockMode ? 'Mock ON' : 'Mock OFF'}
-          </ThemedText>
-          <Switch
-            value={isMockMode}
-            onValueChange={onToggleMockMode}
-            trackColor={{ false: '#374151', true: '#F59E0B' }}
-            thumbColor="#ffffff"
-          />
         </View>
       </View>
 
@@ -179,19 +153,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  mockRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: Spacing.one,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(150, 150, 150, 0.2)',
-  },
-  mockSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
+
   editRow: {
     flexDirection: 'row',
     gap: Spacing.two,

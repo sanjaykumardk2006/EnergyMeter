@@ -23,8 +23,6 @@ export default function HomeScreen() {
     ipAddress,
     setIpAddress,
     isConnected,
-    isMockMode,
-    setIsMockMode,
     isLoading,
     refresh,
     toggleRelay,
@@ -94,8 +92,6 @@ export default function HomeScreen() {
           ipAddress={ipAddress}
           onIpChange={setIpAddress}
           isConnected={isConnected}
-          isMockMode={isMockMode}
-          onToggleMockMode={setIsMockMode}
           onRefresh={refresh}
           isLoading={isLoading}
         />
