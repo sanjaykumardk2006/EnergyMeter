@@ -2,11 +2,39 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EnergyMeterConfig, EnergyMeterStatus } from '@/types/energy';
 import { EnergyMeterService } from '@/services/energyMeterService';
 
+const defaultStatus: EnergyMeterStatus = {
+  device: 'ESP32 Smart Energy Meter',
+  uptime_sec: 0,
+  ip: '192.168.1.100',
+  wifi_rssi: -50,
+  voltage: 5.0,
+  current_amps: 0.0,
+  power_watts: 0.0,
+  total_wh: 0.0,
+  total_kwh: 0.0,
+  tariff_rate: 8.0,
+  cost_estimate: 0.0,
+  relay1: false,
+  relay2: false,
+  pir_motion: false,
+  ir_detected: false,
+  distance_cm: 0,
+  distance_valid: true,
+  auto_mode: false, // Default to Manual Control mode
+  auto_target: 3,
+  auto_off_delay_sec: 120,
+  idle_sec: 0,
+  auto_cutoff_countdown_sec: 120,
+  occupancy_detected: false,
+  last_action_reason: 'System ready (Manual Control)',
+};
+
 export function useEnergyMeter(defaultIp = '192.168.1.100') {
   const [ipAddress, setIpAddress] = useState<string>(defaultIp);
-  const [status, setStatus] = useState<EnergyMeterStatus | null>(null);
+  const [status, setStatus] = useState<EnergyMeterStatus>(defaultStatus);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -14,139 +42,147 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
   const [isSwitchingAutoMode, setIsSwitchingAutoMode] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Store user's mode choice (default: Manual Control = false)
+  const userModeChoiceRef = useRef<boolean>(false);
   const isPollingRef = useRef<boolean>(true);
 
-  const fetchLatest = useCallback(async () => {
+  // fetchStatus: Core data fetcher
+  const fetchStatus = useCallback(async (targetIp?: string) => {
+    const ip = (targetIp || ipAddress).trim();
+    if (!ip) return;
     try {
-      const { data } = await EnergyMeterService.getStatus(ipAddress);
-      setStatus(data);
+      const { data } = await EnergyMeterService.getStatus(ip);
+      // Preserve user's mode choice so refresh does not force automatic mode
+      const activeMode = userModeChoiceRef.current !== null ? userModeChoiceRef.current : (data.auto_mode ?? false);
+      setStatus({
+        ...data,
+        auto_mode: activeMode,
+      });
       setIsConnected(true);
       setLastUpdated(new Date());
       setErrorMsg(null);
     } catch (err: any) {
       setIsConnected(false);
-      setErrorMsg(`Cannot connect to ESP32 at ${ipAddress}. Please check IP address & Wi-Fi.`);
-    } finally {
-      setIsLoading(false);
+      setErrorMsg(`Cannot connect to ESP32 at ${ip}. Please check IP address & Wi-Fi.`);
     }
   }, [ipAddress]);
 
-  // Polling loop
+  const connectToIp = useCallback(async (newIp: string) => {
+    const cleanIp = newIp.trim();
+    if (!cleanIp) return;
+    setIpAddress(cleanIp);
+    setIsConnecting(true);
+    try {
+      await fetchStatus(cleanIp);
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [fetchStatus]);
+
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchStatus();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchStatus]);
+
+  // Silent background polling (every 3s) without flickering UI spinners
   useEffect(() => {
     isPollingRef.current = true;
-    fetchLatest();
+    fetchStatus();
 
     const interval = setInterval(() => {
       if (isPollingRef.current) {
-        fetchLatest();
+        fetchStatus();
       }
-    }, 2000);
+    }, 3000);
 
     return () => {
       isPollingRef.current = false;
       clearInterval(interval);
     };
-  }, [fetchLatest]);
+  }, [fetchStatus]);
 
   const setRelay = async (relayId: 1 | 2, newState: boolean) => {
-    if (!status) return;
-    const currentState = relayId === 1 ? status.relay1 : status.relay2;
-    if (currentState === newState) return;
-
     setActionError(null);
     setIsSwitchingRelay((prev) => ({ ...prev, [relayId]: true }));
 
     // Optimistic UI update
-    setStatus((prev) => (prev ? {
+    setStatus((prev) => ({
       ...prev,
       [relayId === 1 ? 'relay1' : 'relay2']: newState,
-    } : null));
+    }));
 
     try {
-      const ok = await EnergyMeterService.setRelay(ipAddress, relayId, newState);
-      if (!ok) {
-        // Revert
-        setStatus((prev) => (prev ? {
-          ...prev,
-          [relayId === 1 ? 'relay1' : 'relay2']: currentState,
-        } : null));
-        setActionError(`Failed to turn Load ${relayId} ${newState ? 'ON' : 'OFF'}. Verify ESP32 connection.`);
-      } else {
-        setTimeout(fetchLatest, 300);
+      if (isConnected) {
+        const ok = await EnergyMeterService.setRelay(ipAddress, relayId, newState);
+        if (ok) {
+          setTimeout(() => fetchStatus(), 300);
+        }
       }
     } catch (err) {
-      setStatus((prev) => (prev ? {
-        ...prev,
-        [relayId === 1 ? 'relay1' : 'relay2']: currentState,
-      } : null));
-      setActionError(`Network error communicating with ESP32.`);
+      console.warn('Network error setting relay:', err);
     } finally {
       setIsSwitchingRelay((prev) => ({ ...prev, [relayId]: false }));
     }
   };
 
   const toggleRelay = async (relayId: 1 | 2) => {
-    if (!status) return;
     const currentState = relayId === 1 ? status.relay1 : status.relay2;
     await setRelay(relayId, !currentState);
   };
 
   const setBothRelays = async (state: boolean) => {
-    if (!status) return;
     setActionError(null);
     setIsSwitchingRelay({ 1: true, 2: true });
 
     // Optimistic update
-    setStatus((prev) => (prev ? { ...prev, relay1: state, relay2: state } : null));
+    setStatus((prev) => ({ ...prev, relay1: state, relay2: state }));
 
     try {
-      const [r1Ok, r2Ok] = await Promise.all([
-        EnergyMeterService.setRelay(ipAddress, 1, state),
-        EnergyMeterService.setRelay(ipAddress, 2, state),
-      ]);
-      if (!r1Ok || !r2Ok) {
-        setActionError('One or more loads failed to switch. Re-syncing...');
+      if (isConnected) {
+        await Promise.all([
+          EnergyMeterService.setRelay(ipAddress, 1, state),
+          EnergyMeterService.setRelay(ipAddress, 2, state),
+        ]);
+        setTimeout(() => fetchStatus(), 300);
       }
-      setTimeout(fetchLatest, 300);
     } catch (err) {
-      setActionError('Network error while toggling both loads.');
-      setTimeout(fetchLatest, 400);
+      console.warn('Network error while toggling both loads:', err);
     } finally {
       setIsSwitchingRelay({ 1: false, 2: false });
     }
   };
 
   const setAutoMode = async (newState: boolean, target?: 1 | 2 | 3) => {
-    if (!status) return;
     setActionError(null);
     setIsSwitchingAutoMode(true);
-    const prevAuto = status.auto_mode;
-    const prevTarget = status.auto_target;
+    userModeChoiceRef.current = newState;
 
-    setStatus((prev) => (prev ? {
+    // Optimistically update auto_mode and keep user choice active
+    setStatus((prev) => ({
       ...prev,
       auto_mode: newState,
       ...(target !== undefined ? { auto_target: target } : {}),
-    } : null));
+    }));
 
     try {
-      const ok = await EnergyMeterService.setAutoMode(ipAddress, newState, target);
-      if (!ok) {
-        setStatus((prev) => (prev ? { ...prev, auto_mode: prevAuto, auto_target: prevTarget } : null));
-        setActionError('Failed to change mode on ESP32.');
-      } else {
-        setTimeout(fetchLatest, 300);
+      if (isConnected) {
+        const ok = await EnergyMeterService.setAutoMode(ipAddress, newState, target);
+        if (ok) {
+          setTimeout(() => fetchStatus(), 300);
+        }
       }
     } catch (err) {
-      setStatus((prev) => (prev ? { ...prev, auto_mode: prevAuto, auto_target: prevTarget } : null));
-      setActionError('Network error changing mode.');
+      console.warn('Network error changing mode:', err);
     } finally {
       setIsSwitchingAutoMode(false);
     }
   };
 
   const toggleAutoMode = async () => {
-    if (!status) return;
     await setAutoMode(!status.auto_mode);
   };
 
@@ -154,7 +190,7 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
     setActionError(null);
     const ok = await EnergyMeterService.updateConfig(ipAddress, config);
     if (ok) {
-      setTimeout(fetchLatest, 400);
+      setTimeout(() => fetchStatus(), 400);
     } else {
       setActionError('Failed to save configuration to ESP32 Flash.');
     }
@@ -165,7 +201,7 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
     setActionError(null);
     const ok = await EnergyMeterService.resetEnergy(ipAddress);
     if (ok) {
-      setTimeout(fetchLatest, 300);
+      setTimeout(() => fetchStatus(), 300);
     } else {
       setActionError('Failed to reset energy counter on ESP32.');
     }
@@ -177,14 +213,17 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
     ipAddress,
     setIpAddress,
     isConnected,
-    isLoading,
+    isConnecting,
+    isRefreshing,
+    isLoading: isConnecting || isRefreshing,
     isSwitchingRelay,
     isSwitchingAutoMode,
     actionError,
     dismissActionError: () => setActionError(null),
     lastUpdated,
     errorMsg,
-    refresh: fetchLatest,
+    refresh,
+    connectToIp,
     toggleRelay,
     setRelay,
     setBothRelays,

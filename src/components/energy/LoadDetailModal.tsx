@@ -7,7 +7,11 @@ import {
   Switch,
   View,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/context/ThemeContext';
+import { ColorfulIcon } from './ColorfulIcon';
+import { RealisticBulb } from './RealisticBulb';
 
 interface Props {
   visible: boolean;
@@ -31,10 +35,12 @@ export function LoadDetailModal({
   onToggle,
   onClose,
 }: Props) {
+  const { colors, isDark } = useTheme();
+
   // Approximate load share if active
-  const loadAmps = isOn ? (currentAmps > 0 ? (currentAmps / 2) : 0.42) : 0.0;
+  const loadAmps = isOn ? (currentAmps > 0 ? currentAmps / 2 : 0.42) : 0.0;
   const loadWatts = loadAmps * voltage;
-  const loadKwhToday = (loadWatts * 2.5) / 1000; // estimated today based on runtime
+  const loadKwhToday = (loadWatts * 2.5) / 1000;
 
   return (
     <Modal
@@ -42,42 +48,37 @@ export function LoadDetailModal({
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onClose}>
-      <SafeAreaView style={styles.modalRoot}>
+      <SafeAreaView style={[styles.modalRoot, { backgroundColor: colors.background }]}>
         {/* Header Bar */}
-        <View style={styles.headerBar}>
+        <View
+          style={[
+            styles.headerBar,
+            { backgroundColor: colors.card, borderBottomColor: colors.cardBorder },
+          ]}>
           <Pressable style={styles.backBtn} onPress={onClose}>
-            <ThemedText style={styles.backArrow}>‹</ThemedText>
-            <ThemedText style={styles.headerTitle}>
-              Load {loadId} Control
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+            <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
+              Light {loadId} Control
             </ThemedText>
           </Pressable>
         </View>
 
         <View style={styles.content}>
-          {/* Bulb Hero Area */}
+          {/* Light Hero Area with Clean Squircle Lightbulb */}
           <View style={styles.heroSection}>
-            <View
-              style={[
-                styles.bulbGlowCircle,
-                {
-                  backgroundColor: isOn
-                    ? 'rgba(251, 191, 36, 0.2)'
-                    : 'rgba(226, 232, 240, 0.5)',
-                  shadowColor: isOn ? '#F59E0B' : 'transparent',
-                },
-              ]}>
-              <ThemedText style={styles.bulbIcon}>💡</ThemedText>
-            </View>
+            <RealisticBulb isOn={isOn} size={52} />
 
-            <ThemedText style={styles.loadTitle}>Load {loadId}</ThemedText>
-            <ThemedText style={styles.loadSubtitle}>5V DC Bulb</ThemedText>
+            <ThemedText style={[styles.loadTitle, { color: colors.text }]}>Light {loadId}</ThemedText>
+            <ThemedText style={[styles.loadSubtitle, { color: colors.textSecondary }]}>
+              5V DC Relay Load
+            </ThemedText>
 
             {/* Big Toggle Switch */}
             <View style={styles.switchWrapper}>
               <Switch
                 value={isOn}
                 onValueChange={onToggle}
-                trackColor={{ false: '#CBD5E1', true: '#2563EB' }}
+                trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: colors.primary }}
                 thumbColor="#FFFFFF"
                 style={{ transform: [{ scaleX: 1.3 }, { scaleY: 1.3 }] }}
               />
@@ -88,64 +89,110 @@ export function LoadDetailModal({
               style={[
                 styles.stateBanner,
                 {
-                  backgroundColor: isOn ? '#DCFCE7' : '#FEE2E2',
-                  borderColor: isOn ? '#86EFAC' : '#FCA5A5',
+                  backgroundColor: isOn
+                    ? isDark
+                      ? 'rgba(16, 185, 129, 0.2)'
+                      : '#DCFCE7'
+                    : isDark
+                    ? 'rgba(239, 68, 68, 0.2)'
+                    : '#FEE2E2',
+                  borderColor: isOn
+                    ? colors.primaryBorder
+                    : isDark
+                    ? 'rgba(239, 68, 68, 0.4)'
+                    : '#FCA5A5',
                 },
               ]}>
               <ThemedText
                 style={[
                   styles.stateBannerText,
-                  { color: isOn ? '#15803D' : '#B91C1C' },
+                  { color: isOn ? colors.primary : colors.danger },
                 ]}>
-                {isOn ? '✓ Load is ON' : '● Load is OFF'}
+                {isOn ? '● Light is ON • Glowing' : '● Light is OFF'}
               </ThemedText>
             </View>
           </View>
 
-          {/* Details Card */}
-          <View style={styles.detailsCard}>
+          {/* Details Card with Colorful Realistic Badges */}
+          <View
+            style={[
+              styles.detailsCard,
+              { backgroundColor: colors.card, borderColor: colors.cardBorder },
+            ]}>
             <View style={styles.detailRow}>
               <View style={styles.detailLabelCol}>
-                <ThemedText style={styles.detailIcon}>✋</ThemedText>
-                <ThemedText style={styles.detailLabel}>Control Mode</ThemedText>
+                <ColorfulIcon
+                  library="material"
+                  name={autoMode ? 'robot' : 'gesture-tap'}
+                  variant={autoMode ? 'emerald' : 'amber'}
+                  size={16}
+                  containerSize={32}
+                />
+                <ThemedText style={[styles.detailLabel, { color: colors.textSecondary }]}>
+                  Control Mode
+                </ThemedText>
               </View>
-              <ThemedText style={styles.detailValue}>
-                {autoMode ? 'Automatic' : 'Manual'}
+              <ThemedText style={[styles.detailValue, { color: colors.text }]}>
+                {autoMode ? 'Smart Control' : 'Manual Control'}
               </ThemedText>
             </View>
 
-            <View style={styles.rowDivider} />
+            <View style={[styles.rowDivider, { backgroundColor: colors.divider }]} />
 
             <View style={styles.detailRow}>
               <View style={styles.detailLabelCol}>
-                <ThemedText style={styles.detailIcon}>📈</ThemedText>
-                <ThemedText style={styles.detailLabel}>Current</ThemedText>
+                <ColorfulIcon
+                  library="material"
+                  name="sine-wave"
+                  variant="cyan"
+                  size={16}
+                  containerSize={32}
+                />
+                <ThemedText style={[styles.detailLabel, { color: colors.textSecondary }]}>
+                  Current
+                </ThemedText>
               </View>
-              <ThemedText style={styles.detailValue}>
+              <ThemedText style={[styles.detailValue, { color: colors.text }]}>
                 {loadAmps.toFixed(2)} A
               </ThemedText>
             </View>
 
-            <View style={styles.rowDivider} />
+            <View style={[styles.rowDivider, { backgroundColor: colors.divider }]} />
 
             <View style={styles.detailRow}>
               <View style={styles.detailLabelCol}>
-                <ThemedText style={styles.detailIcon}>⚡</ThemedText>
-                <ThemedText style={styles.detailLabel}>Power</ThemedText>
+                <ColorfulIcon
+                  library="ionicons"
+                  name="speedometer"
+                  variant="orange"
+                  size={16}
+                  containerSize={32}
+                />
+                <ThemedText style={[styles.detailLabel, { color: colors.textSecondary }]}>
+                  Power
+                </ThemedText>
               </View>
-              <ThemedText style={styles.detailValue}>
+              <ThemedText style={[styles.detailValue, { color: colors.text }]}>
                 {loadWatts.toFixed(2)} W
               </ThemedText>
             </View>
 
-            <View style={styles.rowDivider} />
+            <View style={[styles.rowDivider, { backgroundColor: colors.divider }]} />
 
             <View style={styles.detailRow}>
               <View style={styles.detailLabelCol}>
-                <ThemedText style={styles.detailIcon}>🔋</ThemedText>
-                <ThemedText style={styles.detailLabel}>Energy (Today)</ThemedText>
+                <ColorfulIcon
+                  library="ionicons"
+                  name="battery-charging"
+                  variant="violet"
+                  size={16}
+                  containerSize={32}
+                />
+                <ThemedText style={[styles.detailLabel, { color: colors.textSecondary }]}>
+                  Energy (Today)
+                </ThemedText>
               </View>
-              <ThemedText style={styles.detailValue}>
+              <ThemedText style={[styles.detailValue, { color: colors.text }]}>
                 {loadKwhToday.toFixed(3)} kWh
               </ThemedText>
             </View>
@@ -159,7 +206,6 @@ export function LoadDetailModal({
 const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   headerBar: {
     flexDirection: 'row',
@@ -167,59 +213,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
   },
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  backArrow: {
-    fontSize: 28,
-    fontWeight: '300',
-    color: '#0F172A',
-    marginTop: -2,
+    gap: 10,
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0F172A',
   },
   content: {
     padding: 20,
-    gap: 24,
+    gap: 20,
   },
   heroSection: {
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 16,
-  },
-  bulbGlowCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOpacity: 0.3,
-    shadowRadius: 18,
-    elevation: 6,
-  },
-  bulbIcon: {
-    fontSize: 48,
+    gap: 10,
+    paddingVertical: 12,
   },
   loadTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#0F172A',
   },
   loadSubtitle: {
     fontSize: 13,
-    color: '#64748B',
     marginTop: -6,
   },
   switchWrapper: {
-    marginVertical: 8,
+    marginVertical: 6,
   },
   stateBanner: {
     width: '100%',
@@ -234,12 +256,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   detailsCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E8EEF5',
-    shadowColor: '#64748B',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 10,
@@ -256,21 +276,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  detailIcon: {
-    fontSize: 16,
-  },
   detailLabel: {
     fontSize: 14,
-    color: '#64748B',
     fontWeight: '500',
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0F172A',
   },
   rowDivider: {
     height: 1,
-    backgroundColor: '#F1F5F9',
   },
 });

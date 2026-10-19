@@ -3,9 +3,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme, Alert } from 'react-native';
 import { useEffect } from 'react';
 import * as Updates from 'expo-updates';
+import { Stack } from 'expo-router';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,7 +40,9 @@ export default function TabLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
-      <AppTabs />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+      </Stack>
     </ThemeProvider>
   );
 }

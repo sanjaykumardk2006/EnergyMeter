@@ -92,7 +92,7 @@ float current_power_watts = 0.0;      // Real-time Power (W)
 float current_amps = 0.0;             // Real-time Current (A)
 
 // Smart Automation Configuration
-bool auto_mode = true;                // True = Automatic Mode, False = Manual Mode
+bool auto_mode = false;               // False = Manual Control (Default), True = Smart Control
 int auto_target = 3;                  // 1 = Load 1 only, 2 = Load 2 only, 3 = Both loads
 int auto_off_delay_sec = 300;         // Default: 300s (5 minutes) vacancy timeout
 float occupancy_dist_threshold_cm = 120.0; // Distance threshold for ultrasonic presence
@@ -220,7 +220,7 @@ void loadEnergyFromFlash() {
   cumulative_kwh = cumulative_wh / 1000.0;
   grid_voltage = preferences.getFloat("voltage", 5.0);
   tariff_rate = preferences.getFloat("tariff", 8.0);
-  auto_mode = preferences.getBool("auto_mode", true);
+  auto_mode = preferences.getBool("auto_mode", false);
   auto_target = preferences.getInt("target", 3);
   auto_off_delay_sec = preferences.getInt("delay_sec", 300);
   acs_calib_factor = preferences.getFloat("calib_i", 1.0);

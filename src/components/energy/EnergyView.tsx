@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/context/ThemeContext';
+import { ColorfulIcon } from './ColorfulIcon';
 import { PowerConsumptionChart } from './PowerConsumptionChart';
 
 interface Props {
@@ -20,6 +22,7 @@ export function EnergyView({
   costEstimate,
   tariffRate,
 }: Props) {
+  const { colors } = useTheme();
   const [filter, setFilter] = useState<'Live' | 'Daily' | 'Weekly' | 'Monthly'>('Daily');
 
   // Estimate active time based on energy consumed vs current power
@@ -29,75 +32,133 @@ export function EnergyView({
 
   return (
     <ScrollView
-      style={styles.scrollArea}
+      style={[styles.scrollArea, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}>
       {/* Header Bar */}
       <View style={styles.headerRow}>
-        <View style={styles.headerIconCircle}>
-          <ThemedText style={styles.headerIcon}>🗓️</ThemedText>
-        </View>
+        <ColorfulIcon
+          library="ionicons"
+          name="analytics"
+          variant="cyan"
+          size={22}
+          containerSize={46}
+        />
         <View>
-          <ThemedText style={styles.headerTitle}>Energy Monitoring</ThemedText>
-          <ThemedText style={styles.headerSubtitle}>
-            Track your consumption
+          <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
+            Energy Analytics
+          </ThemedText>
+          <ThemedText style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+            Real-time power consumption and expenditure
           </ThemedText>
         </View>
       </View>
 
-      {/* 2x2 Telemetry Grid */}
+      {/* 2x2 Telemetry Grid with Colorful Badges */}
       <View style={styles.metricsGrid}>
         {/* Voltage */}
-        <View style={styles.metricCard}>
-          <View style={[styles.metricIconCircle, { backgroundColor: '#ECFDF5' }]}>
-            <ThemedText style={styles.metricIcon}>⚡</ThemedText>
-          </View>
-          <ThemedText style={styles.metricLabel}>Voltage</ThemedText>
-          <ThemedText style={styles.metricNumber}>
+        <View
+          style={[
+            styles.metricCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="ionicons"
+            name="flash"
+            variant="amber"
+            size={18}
+            containerSize={36}
+            style={{ marginBottom: 6 }}
+          />
+          <ThemedText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Voltage
+          </ThemedText>
+          <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {voltage.toFixed(2)} V
           </ThemedText>
-          <ThemedText style={styles.metricSub}>DC Supply</ThemedText>
+          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
+            DC Supply
+          </ThemedText>
         </View>
 
         {/* Current */}
-        <View style={styles.metricCard}>
-          <View style={[styles.metricIconCircle, { backgroundColor: '#EFF6FF' }]}>
-            <ThemedText style={styles.metricIcon}>📈</ThemedText>
-          </View>
-          <ThemedText style={styles.metricLabel}>Current</ThemedText>
-          <ThemedText style={styles.metricNumber}>
+        <View
+          style={[
+            styles.metricCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="material"
+            name="sine-wave"
+            variant="cyan"
+            size={18}
+            containerSize={36}
+            style={{ marginBottom: 6 }}
+          />
+          <ThemedText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Current
+          </ThemedText>
+          <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {currentAmps.toFixed(2)} A
           </ThemedText>
-          <ThemedText style={styles.metricSub}>Total Load</ThemedText>
+          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
+            Total Load
+          </ThemedText>
         </View>
 
         {/* Power */}
-        <View style={styles.metricCard}>
-          <View style={[styles.metricIconCircle, { backgroundColor: '#FFFBEB' }]}>
-            <ThemedText style={styles.metricIcon}>📊</ThemedText>
-          </View>
-          <ThemedText style={styles.metricLabel}>Power</ThemedText>
-          <ThemedText style={styles.metricNumber}>
+        <View
+          style={[
+            styles.metricCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="ionicons"
+            name="speedometer"
+            variant="orange"
+            size={18}
+            containerSize={36}
+            style={{ marginBottom: 6 }}
+          />
+          <ThemedText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Power
+          </ThemedText>
+          <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {powerWatts.toFixed(2)} W
           </ThemedText>
-          <ThemedText style={styles.metricSub}>Voltage × Current</ThemedText>
+          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
+            Voltage × Current
+          </ThemedText>
         </View>
 
         {/* Energy */}
-        <View style={styles.metricCard}>
-          <View style={[styles.metricIconCircle, { backgroundColor: '#F5F3FF' }]}>
-            <ThemedText style={styles.metricIcon}>🔋</ThemedText>
-          </View>
-          <ThemedText style={styles.metricLabel}>Energy</ThemedText>
-          <ThemedText style={styles.metricNumber}>
+        <View
+          style={[
+            styles.metricCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="ionicons"
+            name="battery-charging"
+            variant="violet"
+            size={18}
+            containerSize={36}
+            style={{ marginBottom: 6 }}
+          />
+          <ThemedText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Energy
+          </ThemedText>
+          <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {totalKwh.toFixed(3)} kWh
           </ThemedText>
-          <ThemedText style={styles.metricSub}>Total Consumption</ThemedText>
+          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
+            Total Accumulation
+          </ThemedText>
         </View>
       </View>
 
       {/* Time Range Filter Buttons */}
-      <View style={styles.filterRow}>
+      <View style={[styles.filterRow, { backgroundColor: colors.segmentBg }]}>
         {(['Live', 'Daily', 'Weekly', 'Monthly'] as const).map((item) => {
           const isSelected = filter === item;
           return (
@@ -105,12 +166,13 @@ export function EnergyView({
               key={item}
               style={[
                 styles.filterBtn,
-                isSelected && styles.filterBtnActive,
+                isSelected && [styles.filterBtnActive, { backgroundColor: colors.primary }],
               ]}
               onPress={() => setFilter(item)}>
               <ThemedText
                 style={[
                   styles.filterBtnText,
+                  { color: isSelected ? '#FFFFFF' : colors.textSecondary },
                   isSelected && styles.filterBtnTextActive,
                 ]}>
                 {item}
@@ -123,35 +185,57 @@ export function EnergyView({
       {/* Power Consumption (W) Chart */}
       <PowerConsumptionChart currentPowerWatts={powerWatts} />
 
-      {/* Bottom Summary Stats Cards */}
+      {/* Bottom Summary Stats Cards with Colorful Icons */}
       <View style={styles.bottomStatsRow}>
         {/* Estimated Cost Card */}
-        <View style={styles.summaryCard}>
-          <View style={[styles.summaryIconCircle, { backgroundColor: '#ECFDF5' }]}>
-            <ThemedText style={styles.summaryIcon}>🍃</ThemedText>
-          </View>
-          <View>
-            <ThemedText style={styles.summaryLabel}>Estimated Cost</ThemedText>
-            <ThemedText style={styles.summaryNumber}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="ionicons"
+            name="wallet"
+            variant="emerald"
+            size={20}
+            containerSize={42}
+          />
+          <View style={{ flex: 1 }}>
+            <ThemedText style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+              Estimated Cost
+            </ThemedText>
+            <ThemedText style={[styles.summaryNumber, { color: colors.text }]}>
               ₹{costEstimate.toFixed(2)}
             </ThemedText>
-            <ThemedText style={styles.summarySub}>
+            <ThemedText style={[styles.summarySub, { color: colors.textMuted }]}>
               Today @ ₹{tariffRate.toFixed(1)}/kWh
             </ThemedText>
           </View>
         </View>
 
         {/* Active Time Card */}
-        <View style={styles.summaryCard}>
-          <View style={[styles.summaryIconCircle, { backgroundColor: '#F5F3FF' }]}>
-            <ThemedText style={styles.summaryIcon}>📊</ThemedText>
-          </View>
-          <View>
-            <ThemedText style={styles.summaryLabel}>Active Time</ThemedText>
-            <ThemedText style={styles.summaryNumber}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="ionicons"
+            name="hourglass"
+            variant="rose"
+            size={20}
+            containerSize={42}
+          />
+          <View style={{ flex: 1 }}>
+            <ThemedText style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+              Active Time
+            </ThemedText>
+            <ThemedText style={[styles.summaryNumber, { color: colors.text }]}>
               {activeHours.toFixed(1)} hours
             </ThemedText>
-            <ThemedText style={styles.summarySub}>Today</ThemedText>
+            <ThemedText style={[styles.summarySub, { color: colors.textMuted }]}>
+              Today Active
+            </ThemedText>
           </View>
         </View>
       </View>
@@ -162,7 +246,6 @@ export function EnergyView({
 const styles = StyleSheet.create({
   scrollArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   container: {
     padding: 18,
@@ -175,26 +258,13 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 6,
   },
-  headerIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(37, 99, 235, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    fontSize: 22,
-  },
   headerTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#0F172A',
     letterSpacing: -0.5,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: '#64748B',
     marginTop: 1,
   },
   metricsGrid: {
@@ -205,47 +275,30 @@ const styles = StyleSheet.create({
   metricCard: {
     flexBasis: '47%',
     flexGrow: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E8EEF5',
-    shadowColor: '#64748B',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 10,
     elevation: 3,
     gap: 4,
   },
-  metricIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  metricIcon: {
-    fontSize: 18,
-  },
   metricLabel: {
     fontSize: 12,
-    color: '#64748B',
     fontWeight: '500',
   },
   metricNumber: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
   },
   metricSub: {
     fontSize: 10,
-    color: '#94A3B8',
     fontWeight: '500',
   },
   filterRow: {
     flexDirection: 'row',
-    backgroundColor: '#E2E8F0',
     borderRadius: 12,
     padding: 3,
     gap: 4,
@@ -258,8 +311,6 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   filterBtnActive: {
-    backgroundColor: '#2563EB',
-    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -268,10 +319,8 @@ const styles = StyleSheet.create({
   filterBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
   },
   filterBtnTextActive: {
-    color: '#FFFFFF',
     fontWeight: '700',
   },
   bottomStatsRow: {
@@ -280,43 +329,28 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E8EEF5',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    shadowColor: '#64748B',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 10,
     elevation: 3,
   },
-  summaryIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  summaryIcon: {
-    fontSize: 18,
-  },
   summaryLabel: {
     fontSize: 11,
-    color: '#64748B',
     fontWeight: '500',
   },
   summaryNumber: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#0F172A',
     marginVertical: 1,
   },
   summarySub: {
     fontSize: 10,
-    color: '#94A3B8',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet, View } from 'react-native';
+import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
 
 import { BottomNavBar, TabKey } from '@/components/energy/BottomNavBar';
 import { EnergyView } from '@/components/energy/EnergyView';
@@ -8,9 +8,11 @@ import { LoadDetailModal } from '@/components/energy/LoadDetailModal';
 import { SensorsView } from '@/components/energy/SensorsView';
 import { SettingsView } from '@/components/energy/SettingsView';
 import { SystemStatusModal } from '@/components/energy/SystemStatusModal';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { useEnergyMeter } from '@/hooks/useEnergyMeter';
 
-export default function HomeScreen() {
+function MainAppContent() {
+  const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [loadDetailModal, setLoadDetailModal] = useState<{ visible: boolean; loadId: 1 | 2 }>({
     visible: false,
@@ -23,6 +25,9 @@ export default function HomeScreen() {
     ipAddress,
     setIpAddress,
     isConnected,
+    isConnecting,
+    isRefreshing,
+    isLoading,
     lastUpdated,
     toggleRelay,
     toggleAutoMode,
@@ -30,6 +35,7 @@ export default function HomeScreen() {
     updateConfig,
     resetEnergy,
     refresh,
+    connectToIp,
   } = useEnergyMeter();
 
   const voltage = status?.voltage ?? 5.0; // 5V DC Nominal
@@ -44,7 +50,8 @@ export default function HomeScreen() {
   const irDetected = status?.ir_detected ?? false;
   const distanceCm = status?.distance_cm ?? 0;
   const distanceValid = status?.distance_valid ?? true;
-  const autoMode = status?.auto_mode ?? true;
+  // Default strictly to Manual Control (false)
+  const autoMode = status?.auto_mode ?? false;
   const autoTarget = status?.auto_target ?? 3;
   const autoOffDelaySec = status?.auto_off_delay_sec ?? 300;
   const occupancyDetected =
@@ -53,9 +60,10 @@ export default function HomeScreen() {
   const lastActionReason = status?.last_action_reason;
 
   return (
-    <SafeAreaView style={styles.safeRoot}>
-      <View style={styles.contentContainer}>
-        {/* Tab 1: Home Dashboard (Screen 1: Manual Mode & Screen 2: Automatic Mode) */}
+    <SafeAreaView style={[styles.safeRoot, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <View style={[styles.contentContainer, { backgroundColor: colors.background }]}>
+        {/* Tab 1: Home Dashboard (Screen 1: Manual Control & Screen 2: Smart Control) */}
         {activeTab === 'home' && (
           <HomeDashboardView
             autoMode={autoMode}
@@ -67,6 +75,15 @@ export default function HomeScreen() {
             powerWatts={powerWatts}
             totalKwh={totalKwh}
             autoOffDelaySec={autoOffDelaySec}
+            ipAddress={ipAddress}
+            isConnected={isConnected}
+            isConnecting={isConnecting}
+            isRefreshing={isRefreshing}
+            isLoading={isLoading}
+            lastUpdated={lastUpdated}
+            onConnect={connectToIp}
+            onRefresh={refresh}
+            onSetAutoMode={setAutoMode}
             onToggleAutoMode={toggleAutoMode}
             onToggleRelay1={() => toggleRelay(1)}
             onToggleRelay2={() => toggleRelay(2)}
@@ -122,7 +139,7 @@ export default function HomeScreen() {
       {/* Persistent Bottom Navigation Bar across all tabs */}
       <BottomNavBar activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      {/* Modals for Screens 6 & 7 (Load 1 & Load 2 Controls) */}
+      {/* Modals for Screens 6 & 7 (Light 1 & Light 2 Controls) */}
       <LoadDetailModal
         visible={loadDetailModal.visible}
         loadId={loadDetailModal.loadId}
@@ -150,13 +167,19 @@ export default function HomeScreen() {
   );
 }
 
+export default function HomeScreen() {
+  return (
+    <ThemeProvider>
+      <MainAppContent />
+    </ThemeProvider>
+  );
+}
+
 const styles = StyleSheet.create({
   safeRoot: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   contentContainer: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
 });

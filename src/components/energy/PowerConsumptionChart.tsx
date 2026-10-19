@@ -1,37 +1,49 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Props {
   currentPowerWatts: number;
 }
 
 export function PowerConsumptionChart({ currentPowerWatts }: Props) {
-  // 9 sample data points across 24h
-  // Generate realistic curve anchored by live current power
+  const { colors, isDark } = useTheme();
+
+  // 9 sample data points across 24h anchored by live current power
   const baseWatts = Math.max(0.5, currentPowerWatts > 0 ? currentPowerWatts : 4.3);
   const dataPoints = [
-    { time: '00:00', watts: Math.max(0.2, (baseWatts * 0.35)).toFixed(1) },
-    { time: '03:00', watts: Math.max(0.1, (baseWatts * 0.2)).toFixed(1) },
-    { time: '06:00', watts: Math.max(0.5, (baseWatts * 0.55)).toFixed(1) },
-    { time: '09:00', watts: Math.max(1.2, (baseWatts * 0.85)).toFixed(1) },
+    { time: '00:00', watts: Math.max(0.2, baseWatts * 0.35).toFixed(1) },
+    { time: '03:00', watts: Math.max(0.1, baseWatts * 0.2).toFixed(1) },
+    { time: '06:00', watts: Math.max(0.5, baseWatts * 0.55).toFixed(1) },
+    { time: '09:00', watts: Math.max(1.2, baseWatts * 0.85).toFixed(1) },
     { time: '12:00', watts: (baseWatts * 1.15).toFixed(1) },
     { time: '15:00', watts: (baseWatts * 0.95).toFixed(1) },
     { time: '18:00', watts: (baseWatts * 1.35).toFixed(1) },
     { time: '21:00', watts: baseWatts.toFixed(1) },
-    { time: '24:00', watts: Math.max(0.4, (baseWatts * 0.45)).toFixed(1) },
+    { time: '24:00', watts: Math.max(0.4, baseWatts * 0.45).toFixed(1) },
   ];
 
   const maxScaleWatts = 10;
   const [selectedPoint, setSelectedPoint] = useState<number | null>(7);
 
   return (
-    <View style={styles.card}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.card, borderColor: colors.cardBorder },
+      ]}>
       <View style={styles.cardHeader}>
-        <ThemedText style={styles.cardTitle}>Power Consumption (W)</ThemedText>
+        <ThemedText style={[styles.cardTitle, { color: colors.text }]}>
+          Power Consumption (W)
+        </ThemedText>
         {selectedPoint !== null && (
-          <View style={styles.valueBadge}>
-            <ThemedText style={styles.valueBadgeText}>
+          <View
+            style={[
+              styles.valueBadge,
+              { backgroundColor: colors.primaryTint, borderColor: colors.primaryBorder },
+            ]}>
+            <ThemedText style={[styles.valueBadgeText, { color: colors.primary }]}>
               {dataPoints[selectedPoint].watts} W @ {dataPoints[selectedPoint].time}
             </ThemedText>
           </View>
@@ -42,23 +54,23 @@ export function PowerConsumptionChart({ currentPowerWatts }: Props) {
       <View style={styles.chartContainer}>
         {/* Y Axis Labels & Grid */}
         <View style={styles.yAxisCol}>
-          <ThemedText style={styles.axisLabel}>10</ThemedText>
-          <ThemedText style={styles.axisLabel}>8</ThemedText>
-          <ThemedText style={styles.axisLabel}>6</ThemedText>
-          <ThemedText style={styles.axisLabel}>4</ThemedText>
-          <ThemedText style={styles.axisLabel}>2</ThemedText>
-          <ThemedText style={styles.axisLabel}>0</ThemedText>
+          <ThemedText style={[styles.axisLabel, { color: colors.textMuted }]}>10</ThemedText>
+          <ThemedText style={[styles.axisLabel, { color: colors.textMuted }]}>8</ThemedText>
+          <ThemedText style={[styles.axisLabel, { color: colors.textMuted }]}>6</ThemedText>
+          <ThemedText style={[styles.axisLabel, { color: colors.textMuted }]}>4</ThemedText>
+          <ThemedText style={[styles.axisLabel, { color: colors.textMuted }]}>2</ThemedText>
+          <ThemedText style={[styles.axisLabel, { color: colors.textMuted }]}>0</ThemedText>
         </View>
 
         {/* Chart Plot Area */}
         <View style={styles.plotArea}>
           {/* Horizontal Grid lines */}
-          <View style={[styles.gridLine, { top: '0%' }]} />
-          <View style={[styles.gridLine, { top: '20%' }]} />
-          <View style={[styles.gridLine, { top: '40%' }]} />
-          <View style={[styles.gridLine, { top: '60%' }]} />
-          <View style={[styles.gridLine, { top: '80%' }]} />
-          <View style={[styles.gridLine, { top: '100%' }]} />
+          <View style={[styles.gridLine, { top: '0%', backgroundColor: colors.divider }]} />
+          <View style={[styles.gridLine, { top: '20%', backgroundColor: colors.divider }]} />
+          <View style={[styles.gridLine, { top: '40%', backgroundColor: colors.divider }]} />
+          <View style={[styles.gridLine, { top: '60%', backgroundColor: colors.divider }]} />
+          <View style={[styles.gridLine, { top: '80%', backgroundColor: colors.divider }]} />
+          <View style={[styles.gridLine, { top: '100%', backgroundColor: colors.divider }]} />
 
           {/* Interactive Data Points and Connecting Bars */}
           <View style={styles.pointsRow}>
@@ -72,11 +84,24 @@ export function PowerConsumptionChart({ currentPowerWatts }: Props) {
                   key={idx}
                   style={styles.colTouchArea}
                   onPress={() => setSelectedPoint(idx)}>
-                  <View style={[styles.barFill, { height: `${heightPercent}%` }]}>
+                  <View
+                    style={[
+                      styles.barFill,
+                      {
+                        height: `${heightPercent}%`,
+                        backgroundColor: isDark
+                          ? 'rgba(16, 185, 129, 0.28)'
+                          : 'rgba(5, 150, 105, 0.2)',
+                      },
+                    ]}>
                     <View
                       style={[
                         styles.dotPoint,
-                        isSelected && styles.dotPointActive,
+                        { backgroundColor: colors.primary },
+                        isSelected && [
+                          styles.dotPointActive,
+                          { backgroundColor: colors.primaryHover },
+                        ],
                       ]}
                     />
                   </View>
@@ -89,11 +114,11 @@ export function PowerConsumptionChart({ currentPowerWatts }: Props) {
 
       {/* X Axis Time Labels */}
       <View style={styles.xAxisRow}>
-        <ThemedText style={styles.xAxisLabel}>00:00</ThemedText>
-        <ThemedText style={styles.xAxisLabel}>06:00</ThemedText>
-        <ThemedText style={styles.xAxisLabel}>12:00</ThemedText>
-        <ThemedText style={styles.xAxisLabel}>18:00</ThemedText>
-        <ThemedText style={styles.xAxisLabel}>24:00</ThemedText>
+        <ThemedText style={[styles.xAxisLabel, { color: colors.textMuted }]}>00:00</ThemedText>
+        <ThemedText style={[styles.xAxisLabel, { color: colors.textMuted }]}>06:00</ThemedText>
+        <ThemedText style={[styles.xAxisLabel, { color: colors.textMuted }]}>12:00</ThemedText>
+        <ThemedText style={[styles.xAxisLabel, { color: colors.textMuted }]}>18:00</ThemedText>
+        <ThemedText style={[styles.xAxisLabel, { color: colors.textMuted }]}>24:00</ThemedText>
       </View>
     </View>
   );
@@ -101,12 +126,10 @@ export function PowerConsumptionChart({ currentPowerWatts }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: '#E8EEF5',
-    shadowColor: '#64748B',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 10,
@@ -121,10 +144,9 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
   },
   valueBadge: {
-    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
@@ -132,7 +154,6 @@ const styles = StyleSheet.create({
   valueBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#2563EB',
   },
   chartContainer: {
     flexDirection: 'row',
@@ -147,7 +168,6 @@ const styles = StyleSheet.create({
   },
   axisLabel: {
     fontSize: 10,
-    color: '#94A3B8',
     fontWeight: '500',
   },
   plotArea: {
@@ -160,7 +180,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: '#F1F5F9',
   },
   pointsRow: {
     position: 'absolute',
@@ -181,7 +200,6 @@ const styles = StyleSheet.create({
   },
   barFill: {
     width: 14,
-    backgroundColor: 'rgba(37, 99, 235, 0.18)',
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
     alignItems: 'center',
@@ -191,7 +209,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#2563EB',
     position: 'absolute',
     top: -4,
   },
@@ -199,7 +216,6 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#1D4ED8',
     top: -6,
     borderWidth: 2,
     borderColor: '#FFFFFF',
@@ -212,7 +228,6 @@ const styles = StyleSheet.create({
   },
   xAxisLabel: {
     fontSize: 10,
-    color: '#94A3B8',
     fontWeight: '500',
   },
 });

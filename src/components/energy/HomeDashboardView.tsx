@@ -1,12 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
+  TextInput,
   View,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/context/ThemeContext';
+import { ColorfulIcon } from './ColorfulIcon';
+import { RealisticBulb } from './RealisticBulb';
 
 interface Props {
   autoMode: boolean;
@@ -18,6 +26,15 @@ interface Props {
   powerWatts: number;
   totalKwh: number;
   autoOffDelaySec: number;
+  ipAddress: string;
+  isConnected: boolean;
+  isConnecting?: boolean;
+  isRefreshing?: boolean;
+  isLoading?: boolean;
+  lastUpdated: Date | null;
+  onConnect: (ip: string) => void;
+  onRefresh: () => void;
+  onSetAutoMode: (mode: boolean) => void;
   onToggleAutoMode: () => void;
   onToggleRelay1: () => void;
   onToggleRelay2: () => void;
@@ -36,6 +53,14 @@ export function HomeDashboardView({
   powerWatts,
   totalKwh,
   autoOffDelaySec,
+  ipAddress,
+  isConnected,
+  isConnecting = false,
+  isRefreshing = false,
+  lastUpdated,
+  onConnect,
+  onRefresh,
+  onSetAutoMode,
   onToggleAutoMode,
   onToggleRelay1,
   onToggleRelay2,
@@ -43,99 +68,307 @@ export function HomeDashboardView({
   onOpenSettings,
   onOpenSystemStatus,
 }: Props) {
+  const { colors, isDark } = useTheme();
   const timeoutMins = Math.round(autoOffDelaySec / 60);
+  const [inputIp, setInputIp] = useState<string>(ipAddress);
+
+  useEffect(() => {
+    setInputIp(ipAddress);
+  }, [ipAddress]);
+
+  const handleConnect = () => {
+    if (inputIp.trim()) {
+      onConnect(inputIp.trim());
+    }
+  };
 
   return (
     <ScrollView
-      style={styles.scrollArea}
+      style={[styles.scrollArea, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.container}
-      showsVerticalScrollIndicator={false}>
-      {/* 1. Header Bar */}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          colors={[colors.primary]}
+          tintColor={colors.primary}
+        />
+      }>
+      {/* 1. Header Bar with Colorful Electric Badge */}
       <View style={styles.headerRow}>
         <View style={styles.titleWithIcon}>
-          <View style={styles.lightningIconCircle}>
-            <ThemedText style={styles.lightningIcon}>⚡</ThemedText>
-          </View>
+          <ColorfulIcon
+            library="ionicons"
+            name="flash"
+            variant="emerald"
+            size={22}
+            containerSize={44}
+          />
           <View>
-            <ThemedText style={styles.appTitle}>Smart Energy</ThemedText>
-            <ThemedText style={styles.appSubtitle}>
-              Efficient Living, Greener Tomorrow
+            <ThemedText style={[styles.appTitle, { color: colors.text }]}>
+              Smart Energy Meter
+            </ThemedText>
+            <ThemedText style={[styles.appSubtitle, { color: colors.textSecondary }]}>
+              Live IoT Power & Room Automation
             </ThemedText>
           </View>
         </View>
-
-        <Pressable style={styles.settingsIconBtn} onPress={onOpenSystemStatus}>
-          <ThemedText style={styles.gearIcon}>⚙️</ThemedText>
-        </Pressable>
       </View>
 
-      {/* 2. Operation Mode Selector (Manual vs Automatic) */}
-      <View style={styles.modeSelectorContainer}>
+      {/* 2. ESP32 Network Connection & Controls Card */}
+      <View
+        style={[
+          styles.connectionCard,
+          {
+            backgroundColor: colors.card,
+            borderColor: isDark ? colors.cardBorder : colors.primaryBorder,
+          },
+        ]}>
+        <View style={styles.connectionCardHeader}>
+          <View style={styles.connectionStatusLeft}>
+            <ColorfulIcon
+              library="material"
+              name="chip"
+              variant={isConnected ? 'emerald' : 'rose'}
+              size={19}
+              containerSize={38}
+            />
+            <View>
+              <ThemedText style={[styles.connectionTitle, { color: colors.text }]}>
+                ESP32 Hardware
+              </ThemedText>
+              <ThemedText
+                style={[
+                  styles.connectionStatusText,
+                  { color: isConnected ? colors.primary : colors.danger },
+                ]}>
+                {isConnected ? '● Connected & Ready' : '● Offline • Standby'}
+              </ThemedText>
+            </View>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.refreshButton,
+              {
+                backgroundColor: colors.primaryTint,
+                borderColor: colors.primaryBorder,
+              },
+              pressed && styles.buttonPressed,
+              (isRefreshing || isConnecting) && styles.buttonDisabled,
+            ]}
+            onPress={onRefresh}
+            disabled={isRefreshing || isConnecting}>
+            {isRefreshing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Ionicons name="refresh" size={15} color={colors.primary} />
+                <ThemedText style={[styles.refreshButtonText, { color: colors.primary }]}>
+                  Refresh
+                </ThemedText>
+              </>
+            )}
+          </Pressable>
+        </View>
+
+        <View style={styles.ipInputRow}>
+          <View
+            style={[
+              styles.ipInputWrapper,
+              { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+            ]}>
+            <Ionicons name="globe-outline" size={17} color={colors.textMuted} />
+            <TextInput
+              style={[styles.ipTextInput, { color: colors.text }]}
+              value={inputIp}
+              onChangeText={setInputIp}
+              placeholder="e.g. 192.168.4.1"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleConnect}
+            />
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.connectButton,
+              { backgroundColor: colors.primary },
+              pressed && styles.buttonPressed,
+              (isConnecting || isRefreshing) && styles.buttonDisabled,
+            ]}
+            onPress={handleConnect}
+            disabled={isConnecting || isRefreshing}>
+            {isConnecting ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <View style={styles.connectBtnContent}>
+                <MaterialCommunityIcons name="link-variant" size={15} color="#FFFFFF" />
+                <ThemedText style={styles.connectButtonText}>Connect</ThemedText>
+              </View>
+            )}
+          </Pressable>
+        </View>
+
+        <View style={[styles.connectionCardFooter, { borderTopColor: colors.divider }]}>
+          <ThemedText style={[styles.lastSyncText, { color: colors.textMuted }]}>
+            {lastUpdated
+              ? `Synced ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+              : 'Not synced yet'}
+          </ThemedText>
+          <View style={styles.presetChips}>
+            {['192.168.4.1', '192.168.1.100'].map((preset) => (
+              <Pressable
+                key={preset}
+                style={[
+                  styles.presetChip,
+                  {
+                    backgroundColor: colors.primaryTint,
+                    borderColor: colors.primaryBorder,
+                  },
+                ]}
+                onPress={() => {
+                  setInputIp(preset);
+                  onConnect(preset);
+                }}>
+                <ThemedText style={[styles.presetChipText, { color: colors.primaryHover }]}>
+                  {preset === '192.168.4.1' ? 'AP: .4.1' : 'STA: .1.100'}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      {/* 3. Colorful Mode Toggle: Manual Control vs Smart Control */}
+      <View
+        style={[
+          styles.modeSelectorContainer,
+          {
+            backgroundColor: isDark ? 'rgba(5, 150, 105, 0.12)' : '#ECFDF5',
+            borderColor: isDark ? 'rgba(5, 150, 105, 0.35)' : '#A7F3D0',
+            borderWidth: 1.5,
+          },
+        ]}>
         <Pressable
           style={[
             styles.modeSegment,
-            !autoMode && styles.modeSegmentActive,
+            !autoMode
+              ? [styles.modeSegmentActive, { backgroundColor: colors.primary }]
+              : { backgroundColor: 'transparent' },
           ]}
-          onPress={() => {
-            if (autoMode) onToggleAutoMode();
-          }}>
-          <ThemedText style={styles.modeIcon}>✋</ThemedText>
+          onPress={() => onSetAutoMode(false)}>
+          <View
+            style={[
+              styles.modeSegmentIconSquircle,
+              {
+                backgroundColor: !autoMode
+                  ? 'rgba(255, 255, 255, 0.24)'
+                  : isDark
+                  ? 'rgba(255, 255, 255, 0.08)'
+                  : 'rgba(5, 150, 105, 0.12)',
+              },
+            ]}>
+            <MaterialCommunityIcons
+              name="gesture-tap"
+              size={17}
+              color={!autoMode ? '#FFFFFF' : isDark ? '#A7F3D0' : colors.primary}
+            />
+          </View>
           <ThemedText
             style={[
               styles.modeSegmentText,
+              { color: !autoMode ? '#FFFFFF' : isDark ? '#A7F3D0' : '#047857' },
               !autoMode && styles.modeSegmentTextActive,
             ]}>
-            Manual Mode
+            Manual Control
           </ThemedText>
         </Pressable>
 
         <Pressable
           style={[
             styles.modeSegment,
-            autoMode && styles.modeSegmentActive,
+            autoMode
+              ? [styles.modeSegmentActive, { backgroundColor: colors.primary }]
+              : { backgroundColor: 'transparent' },
           ]}
-          onPress={() => {
-            if (!autoMode) onToggleAutoMode();
-          }}>
-          <ThemedText style={styles.modeIcon}>⚙️</ThemedText>
+          onPress={() => onSetAutoMode(true)}>
+          <View
+            style={[
+              styles.modeSegmentIconSquircle,
+              {
+                backgroundColor: autoMode
+                  ? 'rgba(255, 255, 255, 0.24)'
+                  : isDark
+                  ? 'rgba(255, 255, 255, 0.08)'
+                  : 'rgba(5, 150, 105, 0.12)',
+              },
+            ]}>
+            <MaterialCommunityIcons
+              name="robot"
+              size={17}
+              color={autoMode ? '#FFFFFF' : isDark ? '#A7F3D0' : colors.primary}
+            />
+          </View>
           <ThemedText
             style={[
               styles.modeSegmentText,
+              { color: autoMode ? '#FFFFFF' : isDark ? '#A7F3D0' : '#047857' },
               autoMode && styles.modeSegmentTextActive,
             ]}>
-            Automatic Mode
+            Smart Control
           </ThemedText>
         </Pressable>
       </View>
 
-      {/* 3. Automatic Mode Occupancy Banner (Screen 2) */}
+      {/* 4. Smart Control Occupancy Banner with Colorful Radar */}
       {autoMode && (
         <View
           style={[
             styles.occupancyBanner,
             {
-              backgroundColor: occupancyDetected ? '#ECFDF5' : '#F1F5F9',
-              borderColor: occupancyDetected ? '#A7F3D0' : '#E2E8F0',
+              backgroundColor: occupancyDetected
+                ? isDark
+                  ? 'rgba(16, 185, 129, 0.15)'
+                  : '#ECFDF5'
+                : isDark
+                ? colors.card
+                : '#F1F5F9',
+              borderColor: occupancyDetected
+                ? colors.primaryBorder
+                : isDark
+                ? colors.cardBorder
+                : '#E2E8F0',
             },
           ]}>
           <View style={styles.occupancyLeft}>
-            <View
-              style={[
-                styles.occupancyIconCircle,
-                { backgroundColor: occupancyDetected ? '#DCFCE7' : '#E2E8F0' },
-              ]}>
-              <ThemedText style={styles.occupancyIcon}>
-                {occupancyDetected ? '🏃' : '💤'}
-              </ThemedText>
-            </View>
+            <ColorfulIcon
+              library="material"
+              name={occupancyDetected ? 'motion-sensor' : 'sleep'}
+              variant={occupancyDetected ? 'emerald' : 'slate'}
+              size={20}
+              containerSize={38}
+            />
             <View>
-              <ThemedText style={styles.occupancyTitle}>
+              <ThemedText
+                style={[
+                  styles.occupancyTitle,
+                  { color: occupancyDetected ? colors.primary : colors.textSecondary },
+                ]}>
                 {occupancyDetected ? 'Occupancy Detected' : 'Room is Vacant'}
               </ThemedText>
-              <ThemedText style={styles.occupancySub}>
+              <ThemedText
+                style={[
+                  styles.occupancySub,
+                  { color: occupancyDetected ? colors.primaryHover : colors.textMuted },
+                ]}>
                 {occupancyDetected
-                  ? 'Sensors indicate presence'
-                  : 'No motion or proximity detected'}
+                  ? 'Sensors indicate presence in room'
+                  : 'Sensors clear • Countdown active'}
               </ThemedText>
             </View>
           </View>
@@ -143,167 +376,214 @@ export function HomeDashboardView({
           <View
             style={[
               styles.statusPulseDot,
-              { backgroundColor: occupancyDetected ? '#10B981' : '#94A3B8' },
+              { backgroundColor: occupancyDetected ? colors.success : colors.textMuted },
             ]}
           />
         </View>
       )}
 
-      {/* 4. Loads Control Section (Screen 1 & Screen 2) */}
+      {/* 5. Lights Control Section with Realistic 3D Glowing Bulbs */}
       <View style={styles.sectionHeaderRow}>
-        <ThemedText style={styles.sectionHeading}>
-          {autoMode ? 'Loads Status' : 'Loads Control'}
+        <ThemedText style={[styles.sectionHeading, { color: colors.text }]}>
+          {autoMode ? 'Smart Lights Telemetry' : 'Manual Lights Control'}
         </ThemedText>
       </View>
 
       <View style={styles.loadsRow}>
-        {/* Load 1 Card */}
+        {/* Light 1 Card */}
         <Pressable
-          style={styles.loadCard}
+          style={[
+            styles.loadCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+            relay1 && (isDark ? styles.loadCardGlowingDark : styles.loadCardGlowingLight),
+          ]}
           onPress={() => onOpenLoadDetail(1)}>
-          <View style={styles.bulbCircle}>
-            <ThemedText style={styles.bulbIcon}>💡</ThemedText>
-          </View>
-
-          <ThemedText style={styles.loadName}>Load 1</ThemedText>
-          <ThemedText style={styles.loadType}>5V DC Bulb</ThemedText>
-
-          <View style={styles.switchWrapper}>
+          <View style={styles.loadCardTopRow}>
+            <RealisticBulb isOn={relay1} size={36} />
             <Switch
               value={relay1}
               onValueChange={onToggleRelay1}
-              trackColor={{ false: '#E2E8F0', true: '#2563EB' }}
+              trackColor={{ false: isDark ? '#334155' : '#E2E8F0', true: colors.primary }}
               thumbColor="#FFFFFF"
             />
           </View>
 
-          {autoMode ? (
-            <ThemedText style={styles.autoTagPresence}>
-              ✓ Auto: Presence
+          <View style={styles.loadCardBottom}>
+            <ThemedText style={[styles.loadName, { color: colors.text }]}>Light 1</ThemedText>
+            <ThemedText style={[styles.loadType, { color: colors.textSecondary }]}>
+              {autoMode ? 'Smart: Presence' : (relay1 ? '5V DC • Active ON' : '5V DC • Standby')}
             </ThemedText>
-          ) : (
-            <ThemedText
-              style={[
-                styles.loadStatusText,
-                { color: relay1 ? '#2563EB' : '#94A3B8' },
-              ]}>
-              {relay1 ? 'ON' : 'OFF'}
-            </ThemedText>
-          )}
+          </View>
         </Pressable>
 
-        {/* Load 2 Card */}
+        {/* Light 2 Card */}
         <Pressable
-          style={styles.loadCard}
+          style={[
+            styles.loadCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+            relay2 && (isDark ? styles.loadCardGlowingDark : styles.loadCardGlowingLight),
+          ]}
           onPress={() => onOpenLoadDetail(2)}>
-          <View style={styles.bulbCircle}>
-            <ThemedText style={styles.bulbIcon}>💡</ThemedText>
-          </View>
-
-          <ThemedText style={styles.loadName}>Load 2</ThemedText>
-          <ThemedText style={styles.loadType}>5V DC Bulb</ThemedText>
-
-          <View style={styles.switchWrapper}>
+          <View style={styles.loadCardTopRow}>
+            <RealisticBulb isOn={relay2} size={36} />
             <Switch
               value={relay2}
               onValueChange={onToggleRelay2}
-              trackColor={{ false: '#E2E8F0', true: '#2563EB' }}
+              trackColor={{ false: isDark ? '#334155' : '#E2E8F0', true: colors.primary }}
               thumbColor="#FFFFFF"
             />
           </View>
 
-          {autoMode ? (
-            <ThemedText style={styles.autoTagDistance}>
-              ✓ Auto: Distance
+          <View style={styles.loadCardBottom}>
+            <ThemedText style={[styles.loadName, { color: colors.text }]}>Light 2</ThemedText>
+            <ThemedText style={[styles.loadType, { color: colors.textSecondary }]}>
+              {autoMode ? 'Smart: Distance' : (relay2 ? '5V DC • Active ON' : '5V DC • Standby')}
             </ThemedText>
-          ) : (
-            <ThemedText
-              style={[
-                styles.loadStatusText,
-                { color: relay2 ? '#2563EB' : '#94A3B8' },
-              ]}>
-              {relay2 ? 'ON' : 'OFF'}
-            </ThemedText>
-          )}
+          </View>
         </Pressable>
       </View>
 
-      {/* 5. Auto Control Settings Shortcut (Screen 2) */}
+      {/* 6. Smart Control Settings Shortcut */}
       {autoMode && (
         <View style={styles.autoSettingsSection}>
-          <ThemedText style={styles.sectionHeading}>Auto Control Settings</ThemedText>
-          <Pressable style={styles.timeoutCard} onPress={onOpenSettings}>
+          <ThemedText style={[styles.sectionHeading, { color: colors.text }]}>
+            Smart Control Settings
+          </ThemedText>
+          <Pressable
+            style={[
+              styles.timeoutCard,
+              { backgroundColor: colors.card, borderColor: colors.cardBorder },
+            ]}
+            onPress={onOpenSettings}>
             <View style={styles.timeoutLeft}>
-              <View style={styles.clockCircle}>
-                <ThemedText style={styles.clockIcon}>⏱️</ThemedText>
-              </View>
-              <ThemedText style={styles.timeoutLabel}>
+              <ColorfulIcon
+                library="ionicons"
+                name="timer"
+                variant="cyan"
+                size={18}
+                containerSize={36}
+              />
+              <ThemedText style={[styles.timeoutLabel, { color: colors.text }]}>
                 No Presence Timeout
               </ThemedText>
             </View>
 
             <View style={styles.timeoutRight}>
-              <ThemedText style={styles.timeoutValue}>
+              <ThemedText style={[styles.timeoutValue, { color: colors.textSecondary }]}>
                 {timeoutMins} minutes
               </ThemedText>
-              <ThemedText style={styles.chevron}>›</ThemedText>
+              <Ionicons name="chevron-forward" size={17} color={colors.textMuted} />
             </View>
           </Pressable>
         </View>
       )}
 
-      {/* 6. Real-Time Monitoring Section (2x2 Grid) */}
+      {/* 7. Real-Time Telemetry Metrics with Colorful Badges */}
       <View style={styles.sectionHeaderRow}>
-        <ThemedText style={styles.sectionHeading}>Real-Time Monitoring</ThemedText>
+        <ThemedText style={[styles.sectionHeading, { color: colors.text }]}>
+          Real-Time Monitoring
+        </ThemedText>
       </View>
 
       <View style={styles.metricsGrid}>
         {/* Voltage Card */}
-        <View style={styles.metricCard}>
-          <View style={[styles.metricIconCircle, { backgroundColor: '#ECFDF5' }]}>
-            <ThemedText style={styles.metricIcon}>⚡</ThemedText>
-          </View>
-          <ThemedText style={styles.metricLabel}>Voltage</ThemedText>
-          <ThemedText style={styles.metricNumber}>
+        <View
+          style={[
+            styles.metricCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="ionicons"
+            name="flash"
+            variant="amber"
+            size={18}
+            containerSize={36}
+            style={{ marginBottom: 6 }}
+          />
+          <ThemedText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Voltage
+          </ThemedText>
+          <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {voltage.toFixed(2)} V
           </ThemedText>
-          <ThemedText style={styles.metricSub}>DC Supply</ThemedText>
+          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
+            DC Supply
+          </ThemedText>
         </View>
 
         {/* Current Card */}
-        <View style={styles.metricCard}>
-          <View style={[styles.metricIconCircle, { backgroundColor: '#EFF6FF' }]}>
-            <ThemedText style={styles.metricIcon}>📈</ThemedText>
-          </View>
-          <ThemedText style={styles.metricLabel}>Current</ThemedText>
-          <ThemedText style={styles.metricNumber}>
+        <View
+          style={[
+            styles.metricCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="material"
+            name="sine-wave"
+            variant="cyan"
+            size={18}
+            containerSize={36}
+            style={{ marginBottom: 6 }}
+          />
+          <ThemedText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Current
+          </ThemedText>
+          <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {currentAmps.toFixed(2)} A
           </ThemedText>
-          <ThemedText style={styles.metricSub}>Total Load</ThemedText>
+          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
+            Total Load
+          </ThemedText>
         </View>
 
         {/* Power Card */}
-        <View style={styles.metricCard}>
-          <View style={[styles.metricIconCircle, { backgroundColor: '#FFFBEB' }]}>
-            <ThemedText style={styles.metricIcon}>📊</ThemedText>
-          </View>
-          <ThemedText style={styles.metricLabel}>Power</ThemedText>
-          <ThemedText style={styles.metricNumber}>
+        <View
+          style={[
+            styles.metricCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="ionicons"
+            name="speedometer"
+            variant="orange"
+            size={18}
+            containerSize={36}
+            style={{ marginBottom: 6 }}
+          />
+          <ThemedText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Power
+          </ThemedText>
+          <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {powerWatts.toFixed(2)} W
           </ThemedText>
-          <ThemedText style={styles.metricSub}>Voltage × Current</ThemedText>
+          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
+            Voltage × Current
+          </ThemedText>
         </View>
 
         {/* Energy Card */}
-        <View style={styles.metricCard}>
-          <View style={[styles.metricIconCircle, { backgroundColor: '#F5F3FF' }]}>
-            <ThemedText style={styles.metricIcon}>🔋</ThemedText>
-          </View>
-          <ThemedText style={styles.metricLabel}>Energy</ThemedText>
-          <ThemedText style={styles.metricNumber}>
+        <View
+          style={[
+            styles.metricCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <ColorfulIcon
+            library="ionicons"
+            name="battery-charging"
+            variant="violet"
+            size={18}
+            containerSize={36}
+            style={{ marginBottom: 6 }}
+          />
+          <ThemedText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Energy
+          </ThemedText>
+          <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {totalKwh.toFixed(3)} kWh
           </ThemedText>
-          <ThemedText style={styles.metricSub}>Total Consumption</ThemedText>
+          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
+            Total Accumulation
+          </ThemedText>
         </View>
       </View>
     </ScrollView>
@@ -313,7 +593,6 @@ export function HomeDashboardView({
 const styles = StyleSheet.create({
   scrollArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   container: {
     padding: 18,
@@ -331,75 +610,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  lightningIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(37, 99, 235, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lightningIcon: {
-    fontSize: 24,
-  },
   appTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#0F172A',
     letterSpacing: -0.5,
   },
   appSubtitle: {
     fontSize: 12,
-    color: '#64748B',
     marginTop: 1,
-  },
-  settingsIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gearIcon: {
-    fontSize: 18,
   },
   modeSelectorContainer: {
     flexDirection: 'row',
-    backgroundColor: '#E2E8F0',
     borderRadius: 16,
     padding: 4,
-    gap: 4,
+    gap: 6,
   },
   modeSegment: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
+    gap: 8,
+    paddingVertical: 10,
     borderRadius: 12,
   },
   modeSegmentActive: {
-    backgroundColor: '#2563EB',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  modeIcon: {
-    fontSize: 15,
+  modeSegmentIconSquircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modeSegmentText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
   },
   modeSegmentTextActive: {
-    color: '#FFFFFF',
     fontWeight: '700',
   },
   occupancyBanner: {
@@ -415,24 +667,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  occupancyIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  occupancyIcon: {
-    fontSize: 20,
-  },
   occupancyTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#065F46',
   },
   occupancySub: {
     fontSize: 11,
-    color: '#047857',
     marginTop: 2,
   },
   statusPulseDot: {
@@ -446,7 +686,6 @@ const styles = StyleSheet.create({
   sectionHeading: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
   },
   loadsRow: {
     flexDirection: 'row',
@@ -454,42 +693,48 @@ const styles = StyleSheet.create({
   },
   loadCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E8EEF5',
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 3,
-    gap: 6,
+    shadowRadius: 6,
+    elevation: 2,
+    gap: 8,
   },
-  bulbCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FEF3C7',
+  loadCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
   },
-  bulbIcon: {
-    fontSize: 22,
+  loadCardBottom: {
+    gap: 2,
+  },
+  loadCardGlowingLight: {
+    borderColor: '#A7F3D0',
+    backgroundColor: '#F0FDF4',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  loadCardGlowingDark: {
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    backgroundColor: '#13281C',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   loadName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
   },
   loadType: {
     fontSize: 12,
-    color: '#64748B',
-  },
-  switchWrapper: {
-    alignSelf: 'flex-start',
-    marginVertical: 4,
   },
   loadStatusText: {
     fontSize: 11,
@@ -499,27 +744,23 @@ const styles = StyleSheet.create({
   autoTagPresence: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#10B981',
   },
   autoTagDistance: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#2563EB',
   },
   autoSettingsSection: {
     gap: 10,
   },
   timeoutCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E8EEF5',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
@@ -527,23 +768,11 @@ const styles = StyleSheet.create({
   timeoutLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  clockCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clockIcon: {
-    fontSize: 16,
+    gap: 12,
   },
   timeoutLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0F172A',
   },
   timeoutRight: {
     flexDirection: 'row',
@@ -552,13 +781,7 @@ const styles = StyleSheet.create({
   },
   timeoutValue: {
     fontSize: 13,
-    color: '#64748B',
     fontWeight: '600',
-  },
-  chevron: {
-    fontSize: 18,
-    color: '#94A3B8',
-    fontWeight: '300',
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -568,42 +791,139 @@ const styles = StyleSheet.create({
   metricCard: {
     flexBasis: '47%',
     flexGrow: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E8EEF5',
-    shadowColor: '#64748B',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 10,
     elevation: 3,
     gap: 4,
   },
-  metricIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  metricIcon: {
-    fontSize: 18,
-  },
   metricLabel: {
     fontSize: 12,
-    color: '#64748B',
     fontWeight: '500',
   },
   metricNumber: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
   },
   metricSub: {
     fontSize: 10,
-    color: '#94A3B8',
     fontWeight: '500',
+  },
+  connectionCard: {
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  connectionCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  connectionStatusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  connectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  connectionStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  refreshButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ipInputRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  ipInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 42,
+    gap: 8,
+  },
+  ipTextInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    padding: 0,
+  },
+  connectButton: {
+    height: 42,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 84,
+  },
+  connectBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  connectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  connectionCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+  },
+  lastSyncText: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  presetChips: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  presetChip: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  presetChipText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
 });
