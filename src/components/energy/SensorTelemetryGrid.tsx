@@ -9,20 +9,27 @@ interface Props {
   pirMotion: boolean;
   irDetected: boolean;
   distanceCm: number;
+  distanceValid?: boolean;
+  occupancyDetected?: boolean;
 }
 
 export function SensorTelemetryGrid({
   pirMotion,
   irDetected,
   distanceCm,
+  distanceValid = true,
+  occupancyDetected,
 }: Props) {
   const theme = useTheme();
 
-  // Normalize distance for progress bar (max 200cm range)
+  // Clamped distance for progress bar (200cm range)
   const clampedDist = Math.max(0, Math.min(200, distanceCm));
   const distPercent = (clampedDist / 200) * 100;
 
-  const isHumanPresent = pirMotion || irDetected || distanceCm < 120;
+  // If occupancyDetected is provided from ESP32, use it; otherwise fallback to multi-sensor fusion
+  const isHumanPresent = occupancyDetected !== undefined
+    ? occupancyDetected
+    : (pirMotion || irDetected || (distanceValid && distanceCm > 3.0 && distanceCm < 120.0));
 
   return (
     <ThemedView type="backgroundElement" style={styles.container}>
@@ -30,10 +37,10 @@ export function SensorTelemetryGrid({
       <View style={styles.headerRow}>
         <View style={{ flex: 1, paddingRight: 8 }}>
           <ThemedText type="smallBold" style={styles.sectionTitle}>
-            HARDWARE SENSORS & OCCUPANCY
+            HARDWARE SENSORS & OCCUPANCY FUSION
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Live Telemetry from ESP32 GPIOs
+            Live Telemetry from ESP32 GPIOs (PIR, IR & HC-SR04)
           </ThemedText>
         </View>
 
@@ -64,7 +71,7 @@ export function SensorTelemetryGrid({
           </View>
           <ThemedText type="smallBold">PIR Motion</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Human Detection
+            Active-HIGH
           </ThemedText>
           <View
             style={[
@@ -95,9 +102,9 @@ export function SensorTelemetryGrid({
               <ThemedText style={styles.pinPillText}>GPIO 26</ThemedText>
             </View>
           </View>
-          <ThemedText type="smallBold">IR Obstacle</ThemedText>
+          <ThemedText type="smallBold">IR Sensor</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Proximity / Beam
+            Active-LOW
           </ThemedText>
           <View
             style={[
@@ -115,7 +122,7 @@ export function SensorTelemetryGrid({
                 styles.statePillText,
                 { color: irDetected ? '#F59E0B' : '#94A3B8' },
               ]}>
-              {irDetected ? 'TRIGGERED' : 'CLEAR'}
+              {irDetected ? 'OBSTACLE' : 'CLEAR'}
             </ThemedText>
           </View>
         </View>
@@ -130,13 +137,19 @@ export function SensorTelemetryGrid({
           </View>
           <ThemedText type="smallBold">HC-SR04</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Distance
+            {distanceValid ? 'Distance' : 'Timeout/Err'}
           </ThemedText>
           <View style={styles.distValueWrapper}>
-            <ThemedText style={styles.distNumber}>
-              {distanceCm.toFixed(1)}
+            <ThemedText
+              style={[
+                styles.distNumber,
+                !distanceValid && { color: '#F59E0B' },
+              ]}>
+              {distanceValid ? distanceCm.toFixed(1) : '--'}
             </ThemedText>
-            <ThemedText style={styles.distUnit}>cm</ThemedText>
+            <ThemedText style={styles.distUnit}>
+              {distanceValid ? 'cm' : 'n/a'}
+            </ThemedText>
           </View>
         </View>
       </View>
@@ -145,10 +158,16 @@ export function SensorTelemetryGrid({
       <View style={[styles.distBarContainer, { backgroundColor: theme.background }]}>
         <View style={styles.distBarHeader}>
           <ThemedText type="small" themeColor="textSecondary">
-            Ultrasonic Proximity Range
+            Proximity Proximity Band
           </ThemedText>
           <ThemedText type="smallBold">
-            {distanceCm < 50 ? 'Near (< 50cm)' : distanceCm < 120 ? 'Mid Range' : 'Clear (> 1.2m)'}
+            {!distanceValid
+              ? 'Sensor out of range or timeout'
+              : distanceCm < 50
+              ? 'Near Object (< 50cm)'
+              : distanceCm < 120
+              ? 'Mid Range (< 120cm)'
+              : 'Clear (> 1.2m)'}
           </ThemedText>
         </View>
         <View style={styles.distTrack}>
@@ -157,7 +176,14 @@ export function SensorTelemetryGrid({
               styles.distFill,
               {
                 width: `${distPercent}%`,
-                backgroundColor: distanceCm < 50 ? '#EF4444' : distanceCm < 120 ? '#F59E0B' : '#10B981',
+                backgroundColor:
+                  !distanceValid
+                    ? '#6B7280'
+                    : distanceCm < 50
+                    ? '#EF4444'
+                    : distanceCm < 120
+                    ? '#F59E0B'
+                    : '#10B981',
               },
             ]}
           />

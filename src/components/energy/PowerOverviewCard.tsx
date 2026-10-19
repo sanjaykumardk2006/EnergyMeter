@@ -7,28 +7,28 @@ import { useTheme } from '@/hooks/use-theme';
 
 interface Props {
   powerWatts: number;
+  totalWh: number;
   totalKwh: number;
   costEstimate: number;
   voltage: number;
   currentAmps: number;
   tariffRate: number;
-  isHardwareAcDetected?: boolean;
   isHardwareCurrentActive?: boolean;
 }
 
 export function PowerOverviewCard({
   powerWatts,
+  totalWh,
   totalKwh,
   costEstimate,
   voltage,
   currentAmps,
   tariffRate,
-  isHardwareAcDetected,
   isHardwareCurrentActive,
 }: Props) {
   const theme = useTheme();
 
-  const isPowerActive = powerWatts > 0;
+  const isPowerActive = powerWatts > 0.05 || currentAmps > 0.02;
   const glowColor = isPowerActive ? '#00E5FF' : '#6B7280';
 
   return (
@@ -37,12 +37,12 @@ export function PowerOverviewCard({
       <View style={styles.headerRow}>
         <View style={{ flex: 1, paddingRight: 8 }}>
           <ThemedText type="smallBold" style={styles.titleLabel}>
-            REAL-TIME POWER CONSUMPTION
+            5V DC POWER & ENERGY TELEMETRY
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {isHardwareCurrentActive
-              ? '⚡ Hardware Sensor: ACS712 (GPIO 34)'
-              : 'Active Appliance Load | Nominal Grid 230V'}
+              ? '⚡ ACS712 (GPIO 34) Combined Load Current'
+              : 'Combined 5V DC Loads (P = V × I)'}
           </ThemedText>
         </View>
         <View
@@ -62,26 +62,24 @@ export function PowerOverviewCard({
       <View style={styles.heroPowerRow}>
         <View style={styles.powerValueWrapper}>
           <ThemedText style={[styles.heroPowerNumber, { color: isPowerActive ? glowColor : theme.text }]}>
-            {powerWatts.toFixed(1)}
+            {powerWatts.toFixed(2)}
           </ThemedText>
           <ThemedText style={styles.heroPowerUnit} themeColor="textSecondary">
-            WATTS
+            WATTS (DC)
           </ThemedText>
         </View>
 
         <View style={styles.subStatsCol}>
           <View style={styles.subStatItem}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Grid Voltage
-              </ThemedText>
-            </View>
-            <ThemedText type="smallBold">{voltage.toFixed(0)} V</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Common DC Rail
+            </ThemedText>
+            <ThemedText type="smallBold">{voltage.toFixed(2)} V</ThemedText>
           </View>
           <View style={styles.subStatItem}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <ThemedText type="small" themeColor="textSecondary">
-                Live Current
+                Combined Current
               </ThemedText>
               {(isHardwareCurrentActive || currentAmps > 0.05) && (
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#00E5FF' }} />
@@ -96,13 +94,13 @@ export function PowerOverviewCard({
       <View style={styles.metricsGrid}>
         <View style={[styles.metricCard, { backgroundColor: theme.background }]}>
           <ThemedText type="small" themeColor="textSecondary">
-            Cumulative Energy
+            Energy Consumed (Wh)
           </ThemedText>
           <ThemedText style={styles.metricBig}>
-            {totalKwh.toFixed(4)}
+            {totalWh.toFixed(2)}
           </ThemedText>
           <ThemedText type="small" style={{ color: '#10B981', fontWeight: '600' }}>
-            kWh units
+            {totalKwh.toFixed(5)} kWh
           </ThemedText>
         </View>
 
@@ -111,13 +109,17 @@ export function PowerOverviewCard({
             Estimated Cost
           </ThemedText>
           <ThemedText style={styles.metricBig}>
-            ₹ {costEstimate.toFixed(2)}
+            ₹ {costEstimate.toFixed(3)}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            @ ₹{tariffRate.toFixed(1)}/unit
+            @ ₹{tariffRate.toFixed(1)}/kWh unit
           </ThemedText>
         </View>
       </View>
+
+      <ThemedText type="small" style={styles.disclosureText}>
+        ℹ️ One ACS712 sensor measures combined current of both active 5V DC loads. Power = Voltage × Combined Current.
+      </ThemedText>
     </ThemedView>
   );
 }
@@ -200,5 +202,11 @@ const styles = StyleSheet.create({
   metricBig: {
     fontSize: 20,
     fontWeight: '800',
+  },
+  disclosureText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontStyle: 'italic',
+    marginTop: Spacing.one,
   },
 });

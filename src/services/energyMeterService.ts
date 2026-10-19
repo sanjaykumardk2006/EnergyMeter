@@ -51,9 +51,14 @@ export class EnergyMeterService {
     }
   }
 
-  static async setAutoMode(ip: string, state: boolean): Promise<boolean> {
+  static async setAutoMode(ip: string, state: boolean, target?: 1 | 2 | 3): Promise<boolean> {
     try {
-      const url = this.formatUrl(ip, `/api/auto-mode?state=${state ? 1 : 0}`);
+      const params = new URLSearchParams();
+      params.append('state', state ? '1' : '0');
+      if (target !== undefined) {
+        params.append('target', String(target));
+      }
+      const url = this.formatUrl(ip, `/api/auto-mode?${params.toString()}`);
       const res = await fetchWithTimeout(url, { method: 'POST' }, 3000);
       return res.ok;
     } catch (err) {
@@ -68,14 +73,13 @@ export class EnergyMeterService {
   ): Promise<boolean> {
     try {
       const params = new URLSearchParams();
-      if (config.load1_watts !== undefined) params.append('load1', String(config.load1_watts));
-      if (config.load2_watts !== undefined) params.append('load2', String(config.load2_watts));
+      if (config.auto_mode !== undefined) params.append('auto_mode', config.auto_mode ? '1' : '0');
+      if (config.auto_target !== undefined) params.append('target', String(config.auto_target));
       if (config.grid_voltage !== undefined) params.append('voltage', String(config.grid_voltage));
       if (config.tariff_rate !== undefined) params.append('tariff', String(config.tariff_rate));
       if (config.auto_off_delay_sec !== undefined) params.append('delay', String(config.auto_off_delay_sec));
-      if (config.calib_v !== undefined) params.append('calib_v', String(config.calib_v));
-      if (config.calib_i !== undefined) params.append('calib_i', String(config.calib_i));
       if (config.acs_sens !== undefined) params.append('acs_sens', String(config.acs_sens));
+      if (config.calib_i !== undefined) params.append('calib_i', String(config.calib_i));
 
       const url = this.formatUrl(ip, `/api/config?${params.toString()}`);
       const res = await fetchWithTimeout(url, { method: 'POST' }, 3000);

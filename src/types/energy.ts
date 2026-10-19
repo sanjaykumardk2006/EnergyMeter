@@ -3,39 +3,38 @@ export interface EnergyMeterStatus {
   uptime_sec: number;
   ip: string;
   wifi_rssi: number;
-  ir_detected: boolean;
-  pir_motion: boolean;
-  distance_cm: number;
   relay1: boolean;
   relay2: boolean;
   auto_mode: boolean;
-  power_watts: number;
-  voltage: number;
-  current_amps: number;
-  total_kwh: number;
-  cost_estimate: number;
-  tariff_rate: number;
-  load1_watts: number;
-  load2_watts: number;
+  auto_target: 1 | 2 | 3; // 1 = Load 1, 2 = Load 2, 3 = Both
   auto_off_delay_sec: number;
   idle_sec: number;
   auto_cutoff_countdown_sec: number;
+  occupancy_detected: boolean;
+  pir_motion: boolean;
+  ir_detected: boolean;
+  distance_cm: number;
+  distance_valid: boolean;
+  voltage: number;
+  current_amps: number;
+  power_watts: number;
+  total_wh: number;
+  total_kwh: number;
+  cost_estimate: number;
+  tariff_rate: number;
+  last_action_reason: string;
   hardware_sensors?: boolean;
-  hardware_ac_detected?: boolean;
   hardware_current_active?: boolean;
-  voltage_sensor_connected?: boolean;
-  calib_v?: number;
+  acs_sensitivity?: number;
   calib_i?: number;
-  acs_sens?: number;
 }
 
 export interface EnergyMeterConfig {
-  load1_watts: number;
-  load2_watts: number;
-  grid_voltage: number;
-  tariff_rate: number;
-  auto_off_delay_sec: number;
-  calib_v?: number;
-  calib_i?: number;
+  auto_mode?: boolean;
+  auto_target?: 1 | 2 | 3;
+  auto_off_delay_sec?: number;
+  grid_voltage?: number;
+  tariff_rate?: number;
   acs_sens?: number;
+  calib_i?: number;
 }
