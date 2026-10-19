@@ -1,7 +1,7 @@
 /*
   =============================================================================
   Smart Energy Meter & Room Automation Controller
-  ESP32 Firmware with Dual Relays, IR, PIR, and HC-SR04 Ultrasonic Sensor
+  ESP32 Firmware with Dual Relays, IR, PIR, Ultrasonic & ACS712 Current Sensor
   =============================================================================
   Hardware Pin Map:
   - IR Sensor DO        -> GPIO 26 (Digital IN: LOW when obstacle detected)
@@ -10,13 +10,16 @@
   - HC-SR04 ECHO        -> GPIO 18 (Digital IN via 1kΩ/2kΩ voltage divider)
   - Relay 1 (Load 1)    -> GPIO 25 (Digital OUT: Active-LOW trigger)
   - Relay 2 (Load 2)    -> GPIO 33 (Digital OUT: Active-LOW trigger)
+  - ACS712 Current OUT  -> GPIO 34 (Analog IN: ADC1 CH6 - WiFi Safe)
+  *(Voltage Sensor ZMPT101B is temporarily disabled - Nominal 230V is used)*
 
   Features:
-  - Real-time Power & Cumulative kWh tracking with Non-Volatile Flash storage
-  - Smart Occupancy Auto-Off mode to eliminate vampire power
+  - Live Current (A) from ACS712 Hardware Sensor with noise filtering
+  - Real-time Active Power (Watts) & Cumulative kWh tracking with Flash storage
+  - Smart Presence Auto-ON & Auto-OFF (30s Vacancy Delay)
   - Full REST API with CORS enabled for React Native mobile app & Web integration
-  - Built-in Fallback Web Dashboard for immediate browser testing
-  - WiFi Station + SoftAP fallback (Access Point if router not found)
+  - Built-in Web Dashboard for immediate browser testing
+  - WiFi Station + SoftAP fallback via WiFiManager
   =============================================================================
 */
 
@@ -37,6 +40,9 @@
 #define PIN_RELAY_1   25  // Relay 1 (e.g. Light / Fan)
 #define PIN_RELAY_2   33  // Relay 2 (e.g. AC / Socket)
 
+// Hardware Current Sensor (ADC1 only - WiFi safe on ESP32)
+#define PIN_ACS712    34  // ACS712 Current Sensor Analog OUT (ADC1_CH6)
+
 // Most standard 5V/3.3V relay boards are ACTIVE-LOW (LOW = ON, HIGH = OFF)
 const bool RELAY_ACTIVE_LOW = true;
 #define RELAY_STATE_ON  (RELAY_ACTIVE_LOW ? LOW : HIGH)
@@ -48,10 +54,21 @@ const bool RELAY_ACTIVE_LOW = true;
 WebServer server(80);
 Preferences preferences;
 
+// ACS712 Current Sensor Configuration
+// 5A module  = 0.185 V/A (185 mV/A)
+// 20A module = 0.100 V/A (100 mV/A)
+// 30A module = 0.066 V/A (66 mV/A)
+float acs_sensitivity = 0.100;     // Default: 20A module (0.100 V/A)
+float acs_calib_factor = 1.0;      // Current multiplier calibration factor
+
+// Live Hardware Telemetry
+float measured_current = 0.0;      // Live AC Current (A) from ACS712
+bool hardware_current_active = false; // True when load is detected through ACS712
+
 // Appliance power ratings (in Watts) - user configurable via app/API
 float load1_watts = 60.0;     // Default Load 1: 60W (e.g. bulb / fan)
 float load2_watts = 1200.0;   // Default Load 2: 1200W (e.g. AC / heater / kettle)
-float grid_voltage = 230.0;   // Mains voltage (230V or 120V)
+float grid_voltage = 230.0;   // Nominal Mains voltage (230V AC - used for Power calculation)
 float tariff_rate = 8.0;      // Cost per kWh in your currency (₹ / $ / €)
 
 // Sensor Telemetry
@@ -71,13 +88,62 @@ float current_amps = 0.0;
 
 // Smart Auto-off automation
 bool auto_mode = true;
-int auto_off_delay_sec = 180; // Turn off relays after 3 minutes of no motion
+int auto_off_delay_sec = 30; // Turn off relays after 30 seconds of no motion
 float occupancy_dist_threshold_cm = 120.0; // Distance threshold for ultrasonic
 
 // Timing loops
 unsigned long last_energy_calc_ms = 0;
 unsigned long last_flash_save_ms = 0;
 unsigned long last_sensor_read_ms = 0;
+
+// Sample buffer for 100ms AC current waveform measurement
+static int16_t sample_i[600];
+
+// -----------------------------------------------------------------------------
+// HELPER: Measure AC Current from ACS712 Hardware Sensor
+// -----------------------------------------------------------------------------
+void readHardwareCurrentSensor() {
+  const int NUM_SAMPLES = 600;
+  long sum_i = 0;
+
+  // 1. Synchronized high-speed sampling of ACS712 over ~100ms (5 full AC cycles @ 50Hz)
+  for (int j = 0; j < NUM_SAMPLES; j++) {
+    unsigned long sample_start = micros();
+    int i = analogRead(PIN_ACS712);
+    sample_i[j] = i;
+    sum_i += i;
+
+    // Pace sampling to ~166µs per sample (600 samples * 166µs ≈ 100ms)
+    while (micros() - sample_start < 166) {
+      // Wait for next sample window
+    }
+  }
+
+  // 2. Compute dynamic DC midpoint (cancels quiescent ~2.5V bias and thermal drift)
+  float mid_i = (float)sum_i / (float)NUM_SAMPLES;
+
+  // 3. Compute RMS Current
+  double sum_sq_i = 0.0;
+  for (int j = 0; j < NUM_SAMPLES; j++) {
+    // Convert raw ADC difference to volts (ESP32 ADC: 3.3V / 4095.0 = 0.00080586 V/count)
+    float diff_i = ((float)sample_i[j] - mid_i) * (3.3f / 4095.0f);
+    sum_sq_i += (diff_i * diff_i);
+  }
+
+  // 4. Calculate RMS Current
+  float raw_i_rms = sqrt(sum_sq_i / (float)NUM_SAMPLES);
+  float i_rms = (raw_i_rms / acs_sensitivity) * acs_calib_factor;
+
+  // Noise gate for current: ACS712 has ~50-80mA ADC noise floor on ESP32
+  if (i_rms < 0.08f) {
+    i_rms = 0.0f;
+    hardware_current_active = false;
+  } else {
+    hardware_current_active = true;
+  }
+
+  measured_current = i_rms;
+}
 
 // -----------------------------------------------------------------------------
 // HELPER: Ultrasonic Distance Measurement
@@ -126,6 +192,8 @@ void saveEnergyToFlash() {
   preferences.putFloat("tariff", tariff_rate);
   preferences.putBool("auto_mode", auto_mode);
   preferences.putInt("delay_sec", auto_off_delay_sec);
+  preferences.putFloat("calib_i", acs_calib_factor);
+  preferences.putFloat("acs_sens", acs_sensitivity);
   preferences.end();
 }
 
@@ -137,7 +205,9 @@ void loadEnergyFromFlash() {
   grid_voltage = preferences.getFloat("voltage", 230.0);
   tariff_rate = preferences.getFloat("tariff", 8.0);
   auto_mode = preferences.getBool("auto_mode", true);
-  auto_off_delay_sec = preferences.getInt("delay_sec", 180);
+  auto_off_delay_sec = preferences.getInt("delay_sec", 30);
+  acs_calib_factor = preferences.getFloat("calib_i", 1.0);
+  acs_sensitivity = preferences.getFloat("acs_sens", 0.100);
   preferences.end();
 }
 
@@ -186,7 +256,12 @@ void handleGetStatus() {
   json += "\"load2_watts\":" + String(load2_watts, 1) + ",";
   json += "\"auto_off_delay_sec\":" + String(auto_off_delay_sec) + ",";
   json += "\"idle_sec\":" + String(idle_time_sec) + ",";
-  json += "\"auto_cutoff_countdown_sec\":" + String(countdown_sec);
+  json += "\"auto_cutoff_countdown_sec\":" + String(countdown_sec) + ",";
+  json += "\"hardware_sensors\":true,";
+  json += "\"hardware_current_active\":" + String(hardware_current_active ? "true" : "false") + ",";
+  json += "\"voltage_sensor_connected\":false,";
+  json += "\"calib_i\":" + String(acs_calib_factor, 2) + ",";
+  json += "\"acs_sens\":" + String(acs_sensitivity, 3);
   json += "}";
 
   server.send(200, "application/json", json);
@@ -252,6 +327,8 @@ void handlePostConfig() {
   if (server.hasArg("voltage")) grid_voltage = server.arg("voltage").toFloat();
   if (server.hasArg("tariff")) tariff_rate = server.arg("tariff").toFloat();
   if (server.hasArg("delay")) auto_off_delay_sec = server.arg("delay").toInt();
+  if (server.hasArg("calib_i")) acs_calib_factor = server.arg("calib_i").toFloat();
+  if (server.hasArg("acs_sens")) acs_sensitivity = server.arg("acs_sens").toFloat();
 
   // Also support JSON body
   if (server.hasArg("plain")) {
@@ -262,6 +339,8 @@ void handlePostConfig() {
     if ((i = b.indexOf("\"voltage\":")) != -1) grid_voltage = b.substring(i + 10).toFloat();
     if ((i = b.indexOf("\"tariff\":")) != -1) tariff_rate = b.substring(i + 9).toFloat();
     if ((i = b.indexOf("\"delay\":")) != -1) auto_off_delay_sec = b.substring(i + 8).toInt();
+    if ((i = b.indexOf("\"calib_i\":")) != -1) acs_calib_factor = b.substring(i + 10).toFloat();
+    if ((i = b.indexOf("\"acs_sens\":")) != -1) acs_sensitivity = b.substring(i + 11).toFloat();
   }
 
   saveEnergyToFlash();
@@ -283,7 +362,7 @@ void handleRootWeb() {
   html += "<title>ESP32 Smart Energy Meter</title>";
   html += "<style>";
   html += "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0d1117;color:#c9d1d9;margin:0;padding:20px;display:flex;justify-content:center;}";
-  html += ".box{max-width:480px;width:100%;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;box-shadow:0 8px 24px rgba(0,0,0,0.5);}";
+  html += ".box{max-width:540px;width:100%;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;box-shadow:0 8px 24px rgba(0,0,0,0.5);}";
   html += "h1{font-size:20px;color:#58a6ff;margin-top:0;display:flex;align-items:center;gap:8px;}";
   html += ".grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}";
   html += ".card{background:#21262d;border:1px solid #30363d;border-radius:8px;padding:12px;}";
@@ -293,13 +372,16 @@ void handleRootWeb() {
   html += ".btn.off{background:#da3633;}";
   html += ".badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:bold;}";
   html += ".badge.on{background:#238636;color:#fff;} .badge.off{background:#30363d;color:#8b949e;}";
+  html += ".telemetry{font-size:11px;color:#58a6ff;margin-bottom:12px;padding:6px 10px;background:rgba(88,166,255,0.1);border-radius:6px;}";
   html += "</style></head><body><div class='box'>";
   html += "<h1>⚡ Smart Energy Meter</h1>";
-  html += "<p style='font-size:12px;color:#8b949e'>ESP32 Hardware & React Native Bridge</p>";
+  html += "<div class='telemetry'>Hardware Sensor: ACS712 (GPIO 34) " + String(hardware_current_active ? "🟢 ACTIVE LOAD (" + String(current_amps, 2) + "A)" : "🟡 STANDBY") + " | Voltage: Nominal Grid (" + String(grid_voltage, 0) + "V)</div>";
 
   html += "<div class='grid'>";
-  html += "<div class='card'><h3>Power (W)</h3><div class='val' id='pwr'>" + String(current_power_watts, 1) + " W</div></div>";
+  html += "<div class='card'><h3>Active Power</h3><div class='val' id='pwr'>" + String(current_power_watts, 1) + " W</div></div>";
   html += "<div class='card'><h3>Total Energy</h3><div class='val' id='kwh'>" + String(cumulative_kwh, 4) + " kWh</div></div>";
+  html += "<div class='card'><h3>Grid Voltage</h3><div class='val' id='volt'>" + String(grid_voltage, 1) + " V</div></div>";
+  html += "<div class='card'><h3>Live Current</h3><div class='val' id='curr'>" + String(current_amps, 2) + " A</div></div>";
   html += "<div class='card'><h3>PIR Motion</h3><div class='val'><span class='badge " + String(pir_motion ? "on" : "off") + "'>" + String(pir_motion ? "DETECTED" : "CLEAR") + "</span></div></div>";
   html += "<div class='card'><h3>IR Obstacle</h3><div class='val'><span class='badge " + String(ir_detected ? "on" : "off") + "'>" + String(ir_detected ? "DETECTED" : "CLEAR") + "</span></div></div>";
   html += "<div class='card'><h3>Distance</h3><div class='val'>" + String(distance_cm, 1) + " cm</div></div>";
@@ -317,8 +399,8 @@ void handleRootWeb() {
   html += "<button class='btn " + String(relay2_on ? "off" : "") + "' onclick=\"fetch('/api/relay?id=2&state=" + String(relay2_on ? "0" : "1") + "',{method:'POST'}).then(()=>location.reload())\">" + String(relay2_on ? "Turn OFF" : "Turn ON") + "</button>";
   html += "</div>";
 
-  html += "<p style='font-size:11px;color:#8b949e;margin-top:16px;'>Use the React Native mobile app for full telemetry and remote control.</p>";
-  html += "</div><script>setTimeout(()=>location.reload(),4000);</script></body></html>";
+  html += "<p style='font-size:11px;color:#8b949e;margin-top:16px;'>Connected to React Native mobile app for full telemetry and remote control.</p>";
+  html += "</div><script>setTimeout(()=>location.reload(),3000);</script></body></html>";
 
   server.send(200, "text/html", html);
 }
@@ -345,9 +427,16 @@ void setup() {
   digitalWrite(PIN_RELAY_1, RELAY_STATE_OFF);
   digitalWrite(PIN_RELAY_2, RELAY_STATE_OFF);
 
+  // ADC Configuration for Hardware ACS712 Current Sensor (ADC1 CH6 - Pin 34)
+  pinMode(PIN_ACS712, INPUT);
+  // Note: ZMPT101B Voltage sensor pin 35 is temporarily disabled until connected
+  analogReadResolution(12);
+  analogSetAttenuation(ADC_11db);
+
   // Load persistent energy and settings from flash memory
   loadEnergyFromFlash();
   Serial.printf("Loaded saved energy: %.4f kWh\n", cumulative_kwh);
+  Serial.printf("ACS712 Sensor: Calib=%.2f, Sens=%.3f V/A | Grid Voltage=%.1f V\n", acs_calib_factor, acs_sensitivity, grid_voltage);
 
   // Connect to WiFi using WiFiManager
   Serial.println("Initializing WiFiManager...");
@@ -413,37 +502,82 @@ void loop() {
 
     // Ultrasonic HC-SR04 distance measurement
     distance_cm = measureDistanceCm();
+    Serial.print("PIR = ");
+    Serial.print(pir_motion);
 
-    // Check motion / occupancy presence
-    bool presence_detected = pir_motion || ir_detected || (distance_cm > 2.0 && distance_cm < occupancy_dist_threshold_cm);
-    if (presence_detected) {
-      last_motion_timestamp = now;
-    }
+    Serial.print(" | IR = ");
+    Serial.print(ir_detected);
 
-    // Smart Energy Saving Auto-cut-off:
-    // If auto_mode is enabled, and no motion detected for auto_off_delay_sec, shut off relays!
-    if (auto_mode && (relay1_on || relay2_on)) {
-      unsigned long idle_sec = (now - last_motion_timestamp) / 1000;
-      if (idle_sec >= (unsigned long)auto_off_delay_sec) {
-        Serial.printf("[AUTO ECO MODE] No occupancy for %lu seconds. Shutting off relays to save energy!\n", idle_sec);
-        setRelay(1, false);
-        setRelay(2, false);
+    Serial.print(" | Distance = ");
+    Serial.println(distance_cm);
+
+    // Check presence using ALL THREE sensors
+    bool presence_detected =
+        pir_motion ||
+        ir_detected ||
+        (distance_cm > 2.0 &&
+         distance_cm < occupancy_dist_threshold_cm);
+         
+    Serial.print("AUTO = ");
+    Serial.print(auto_mode);
+    Serial.print(" | PRESENCE = ");
+    Serial.println(presence_detected);
+
+    if (auto_mode) {
+      // PERSON PRESENT: Any one sensor detects presence
+      if (presence_detected) {
+        last_motion_timestamp = now;
+
+        // Turn BOTH relays ON
+        setRelay(1, true);
+        setRelay(2, true);
+
+        Serial.println("[AUTO] Presence detected -> BOTH RELAYS ON");
+      }
+      // NO PERSON
+      else {
+        unsigned long idle_sec = (now - last_motion_timestamp) / 1000;
+
+        // 30 seconds without presence
+        if (idle_sec >= (unsigned long)auto_off_delay_sec) {
+          // Turn BOTH relays OFF
+          setRelay(1, false);
+          setRelay(2, false);
+
+          Serial.printf("[AUTO] No presence for %d seconds -> BOTH RELAYS OFF\n", auto_off_delay_sec);
+        }
       }
     }
   }
 
-  // 2. Real-time Power & Cumulative Energy calculation every 1000ms
+  // 2. Real-time Hardware Energy Calculation every 1000ms
   if (now - last_energy_calc_ms >= 1000) {
     unsigned long delta_ms = now - last_energy_calc_ms;
     last_energy_calc_ms = now;
 
-    // Current active power in Watts
-    current_power_watts = 0.0;
-    if (relay1_on) current_power_watts += load1_watts;
-    if (relay2_on) current_power_watts += load2_watts;
+    // Read real AC current from ACS712 hardware sensor
+    readHardwareCurrentSensor();
 
-    // Current in Amperes = Power / Voltage
-    current_amps = (grid_voltage > 0) ? (current_power_watts / grid_voltage) : 0.0;
+    if (hardware_current_active) {
+      // Physical load is running through ACS712 current sensor
+      current_amps = measured_current;
+      // Active Power (Watts) = Current (A) * Nominal Grid Voltage (230V)
+      current_power_watts = current_amps * grid_voltage;
+    } else {
+      // ACS712 reads no active current (< 0.08A)
+      // If relays are turned on in bench test mode without high-voltage load on ACS712:
+      float simulated_power = 0.0;
+      if (relay1_on) simulated_power += load1_watts;
+      if (relay2_on) simulated_power += load2_watts;
+
+      if (simulated_power > 0.0 && grid_voltage > 0.0) {
+        current_power_watts = simulated_power;
+        current_amps = current_power_watts / grid_voltage;
+      } else {
+        current_power_watts = 0.0;
+        current_amps = 0.0;
+      }
+    }
 
     // Energy (kWh) = (Power in Watts * time in hours) / 1000
     double delta_hours = (double)delta_ms / 3600000.0;

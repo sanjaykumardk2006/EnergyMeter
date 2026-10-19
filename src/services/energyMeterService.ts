@@ -73,6 +73,9 @@ export class EnergyMeterService {
       if (config.grid_voltage !== undefined) params.append('voltage', String(config.grid_voltage));
       if (config.tariff_rate !== undefined) params.append('tariff', String(config.tariff_rate));
       if (config.auto_off_delay_sec !== undefined) params.append('delay', String(config.auto_off_delay_sec));
+      if (config.calib_v !== undefined) params.append('calib_v', String(config.calib_v));
+      if (config.calib_i !== undefined) params.append('calib_i', String(config.calib_i));
+      if (config.acs_sens !== undefined) params.append('acs_sens', String(config.acs_sens));
 
       const url = this.formatUrl(ip, `/api/config?${params.toString()}`);
       const res = await fetchWithTimeout(url, { method: 'POST' }, 3000);

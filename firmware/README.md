@@ -8,6 +8,12 @@ This firmware turns your ESP32 into a Smart Energy Meter & Room Automation Contr
 
 | Component | Pin | ESP32 Pin | Purpose |
 | :--- | :--- | :--- | :--- |
+| **ZMPT101B Voltage Sensor** | VCC | `VIN / 5V` | 5V Power supply |
+| | GND | `GND` | Common Ground |
+| | OUT | `GPIO 35` | Analog Input (ADC1 CH7 - WiFi safe) |
+| **ACS712 Current Sensor** | VCC | `VIN / 5V` | 5V Power supply |
+| | GND | `GND` | Common Ground |
+| | OUT | `GPIO 34` | Analog Input (ADC1 CH6 - WiFi safe) |
 | **IR Sensor** | VCC | `3V3` | 3.3V Power |
 | | GND | `GND` | Common Ground |
 | | DO | `GPIO 26` | Digital In (LOW when obstacle detected) |
@@ -21,6 +27,62 @@ This firmware turns your ESP32 into a Smart Energy Meter & Room Automation Contr
 | | ECHO | `GPIO 18` | Through 1kΩ + 2kΩ Resistor Voltage Divider |
 | **Relay 1 (Load 1)** | IN1 | `GPIO 25` | Active-LOW Trigger (Bulb, Fan, etc.) |
 | **Relay 2 (Load 2)** | IN2 | `GPIO 33` | Active-LOW Trigger (AC, Heater, Socket, etc.) |
+
+---
+
+## ⚡ AC Mains Wiring Schematic (ZMPT101B & ACS712)
+
+> ⚠️ **HIGH VOLTAGE WARNING (230V AC)**: Mains voltage can be lethal. Turn off the main circuit breaker before touching any AC wiring. Ensure all AC connections are properly insulated with heat shrink or terminal blocks.
+
+```
+                  ┌───────────────────────────────────────────────┐
+                  │                 AC MAINS (230V)               │
+                  │   Phase (L)                       Neutral (N) │
+                  └──────┬─────────────────────────────────┬──────┘
+                         │                                 │
+                         │                                 │
+    ┌────────────────────┼────────────────┐                │
+    │   ZMPT101B Module  │                │                │
+    │   [ AC Terminal 1 ]│                │                │
+    │   [ AC Terminal 2 ]├────────────────┼────────────────┘
+    │                    │                │
+    │   VCC ──> 5V       │                │
+    │   GND ──> GND      │                │
+    │   OUT ──> GPIO 35  │                │
+    └────────────────────┘                │
+                                          │
+                         │                │
+                         ▼ (Phase In)     │
+    ┌─────────────────────────────────┐   │
+    │   ACS712 Current Sensor         │   │
+    │   [ Terminal 1 ] (Phase IN)     │   │
+    │   [ Terminal 2 ] (Phase OUT) ───┼───┼──────────┐
+    │                                 │   │          │
+    │   VCC ──> 5V                    │   │          │
+    │   GND ──> GND                   │   │          │
+    │   OUT ──> GPIO 34               │   │          │
+    └─────────────────────────────────┘   │          │
+                                          │          │
+                                          │          ▼
+                                          │     ┌──────────┐
+                                          │     │ Relay /  │
+                                          │     │ Appliance│
+                                          └─────┤ Load     │
+                                                └──────────┘
+```
+
+### 1. ZMPT101B Voltage Connection:
+- Connect the two AC screw terminals of the ZMPT101B module in **parallel** across AC Phase (Live) and Neutral.
+- Connect VCC to 5V, GND to ESP32 GND, and OUT to ESP32 **GPIO 35**.
+
+### 2. ACS712 Current Connection:
+- Connect the ACS712 screw terminal in **series** with the Phase (Live) line running to your relay and appliance load.
+- Connect VCC to 5V, GND to ESP32 GND, and OUT to ESP32 **GPIO 34**.
+
+### 3. ZMPT101B Potentiometer Calibration:
+- Power up the ESP32 and plug in the 230V AC mains.
+- Open the built-in web page (`http://<ESP32-IP>/`) or the mobile app.
+- Turn the small blue multi-turn trimmer screw on the ZMPT101B board with a screwdriver until the voltage readout matches your multimeter (e.g. ~230V).
 
 ---
 

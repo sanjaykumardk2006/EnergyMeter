@@ -68,6 +68,8 @@ export default function HomeScreen() {
   const idleSec = status?.idle_sec ?? 0;
   const autoCutoffCountdownSec = status?.auto_cutoff_countdown_sec ?? 0;
   const autoOffDelaySec = status?.auto_off_delay_sec ?? 180;
+  const isHardwareAcDetected = status?.hardware_ac_detected ?? (voltage > 10);
+  const isHardwareCurrentActive = status?.hardware_current_active ?? (currentAmps > 0.05);
 
   return (
     <ScrollView
@@ -104,6 +106,8 @@ export default function HomeScreen() {
           voltage={voltage}
           currentAmps={currentAmps}
           tariffRate={tariffRate}
+          isHardwareAcDetected={isHardwareAcDetected}
+          isHardwareCurrentActive={isHardwareCurrentActive}
         />
 
         {/* 3. Dual Relay Control */}

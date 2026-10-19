@@ -20,6 +20,13 @@ export interface EnergyMeterStatus {
   auto_off_delay_sec: number;
   idle_sec: number;
   auto_cutoff_countdown_sec: number;
+  hardware_sensors?: boolean;
+  hardware_ac_detected?: boolean;
+  hardware_current_active?: boolean;
+  voltage_sensor_connected?: boolean;
+  calib_v?: number;
+  calib_i?: number;
+  acs_sens?: number;
 }
 
 export interface EnergyMeterConfig {
@@ -28,4 +35,7 @@ export interface EnergyMeterConfig {
   grid_voltage: number;
   tariff_rate: number;
   auto_off_delay_sec: number;
+  calib_v?: number;
+  calib_i?: number;
+  acs_sens?: number;
 }

@@ -25,7 +25,6 @@ export default function ExploreScreen() {
   const {
     status,
     ipAddress,
-    isMockMode,
     updateConfig,
     resetEnergy,
   } = useEnergyMeter();
@@ -35,6 +34,8 @@ export default function ExploreScreen() {
   const [voltage, setVoltage] = useState(String(status?.voltage ?? 230));
   const [tariff, setTariff] = useState(String(status?.tariff_rate ?? 8));
   const [delaySec, setDelaySec] = useState(String(status?.auto_off_delay_sec ?? 180));
+  const [calibV, setCalibV] = useState(String(status?.calib_v ?? 580));
+  const [calibI, setCalibI] = useState(String(status?.calib_i ?? 1.0));
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   const insets = {
@@ -65,6 +66,8 @@ export default function ExploreScreen() {
     const v = parseFloat(voltage);
     const t = parseFloat(tariff);
     const d = parseInt(delaySec, 10);
+    const cv = parseFloat(calibV);
+    const ci = parseFloat(calibI);
 
     if (isNaN(l1) || isNaN(l2) || isNaN(v) || isNaN(t) || isNaN(d)) {
       if (Platform.OS === 'web') {
@@ -81,6 +84,8 @@ export default function ExploreScreen() {
       grid_voltage: v,
       tariff_rate: t,
       auto_off_delay_sec: d,
+      calib_v: isNaN(cv) ? undefined : cv,
+      calib_i: isNaN(ci) ? undefined : ci,
     });
 
     if (ok) {
@@ -166,6 +171,20 @@ export default function ExploreScreen() {
               </ThemedText>
             </View>
 
+            <View style={styles.pinRow}>
+              <ThemedText type="smallBold">5. Current Sensor (ACS712):</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                OUT → <ThemedText type="code">GPIO 34</ThemedText> (ADC1) | VCC → 5V | In series with AC Phase
+              </ThemedText>
+            </View>
+
+            <View style={styles.pinRow}>
+              <ThemedText type="smallBold">6. Voltage Sensor (ZMPT101B):</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                OUT → <ThemedText type="code">GPIO 35</ThemedText> (Temporarily Disabled - Sensor not connected)
+              </ThemedText>
+            </View>
+
             <View style={styles.divider} />
             <ThemedText type="small" style={{ fontStyle: 'italic', color: '#F59E0B' }}>
               ⚠️ Voltage Divider for Echo: 1kΩ resistor from HC-SR04 ECHO to GPIO 18, and 2kΩ from GPIO 18 to GND to step 5V down to ~3.3V safely.
@@ -176,10 +195,10 @@ export default function ExploreScreen() {
         {/* 2. Appliance & Energy Calibration */}
         <ThemedView type="backgroundElement" style={styles.sectionCard}>
           <ThemedText type="smallBold" style={styles.sectionHeading}>
-            ⚡ APPLIANCE POWER & TARIFF CONFIGURATION
+            ⚡ APPLIANCE POWER & SENSOR CALIBRATION
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Set rated wattage for connected loads to ensure accurate kWh accumulation.
+            Set rated wattage or fine-tune physical ZMPT101B and ACS712 sensor calibration multipliers.
           </ThemedText>
 
           <View style={styles.inputGrid}>
@@ -206,13 +225,24 @@ export default function ExploreScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <ThemedText type="smallBold">Grid Voltage (V)</ThemedText>
+              <ThemedText type="smallBold">ZMPT101B Calib Multiplier</ThemedText>
               <TextInput
                 style={[styles.input, { color: theme.text, backgroundColor: theme.background }]}
                 keyboardType="numeric"
-                value={voltage}
-                onChangeText={setVoltage}
-                placeholder="230"
+                value={calibV}
+                onChangeText={setCalibV}
+                placeholder="580"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText type="smallBold">ACS712 Current Calib</ThemedText>
+              <TextInput
+                style={[styles.input, { color: theme.text, backgroundColor: theme.background }]}
+                keyboardType="numeric"
+                value={calibI}
+                onChangeText={setCalibI}
+                placeholder="1.0"
               />
             </View>
 
@@ -227,8 +257,8 @@ export default function ExploreScreen() {
               />
             </View>
 
-            <View style={styles.inputGroupFull}>
-              <ThemedText type="smallBold">Auto-Off Vacancy Delay (Seconds)</ThemedText>
+            <View style={styles.inputGroup}>
+              <ThemedText type="smallBold">Auto-Off Delay (Sec)</ThemedText>
               <TextInput
                 style={[styles.input, { color: theme.text, backgroundColor: theme.background }]}
                 keyboardType="numeric"
@@ -277,7 +307,7 @@ export default function ExploreScreen() {
               Endpoint: <ThemedText type="code">http://{ipAddress}/api/status</ThemedText>
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Mode: {isMockMode ? 'Simulated Offline Demo' : 'Live ESP32 Device'}
+              Mode: {status?.hardware_sensors ? 'Live Hardware Sensors (ACS712 + ZMPT101B)' : 'ESP32 Device Connection'}
             </ThemedText>
             <View style={[styles.codeBox, { backgroundColor: theme.background }]}>
               <ThemedText type="code" style={styles.codeText}>

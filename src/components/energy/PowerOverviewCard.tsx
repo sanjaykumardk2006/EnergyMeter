@@ -12,6 +12,8 @@ interface Props {
   voltage: number;
   currentAmps: number;
   tariffRate: number;
+  isHardwareAcDetected?: boolean;
+  isHardwareCurrentActive?: boolean;
 }
 
 export function PowerOverviewCard({
@@ -21,6 +23,8 @@ export function PowerOverviewCard({
   voltage,
   currentAmps,
   tariffRate,
+  isHardwareAcDetected,
+  isHardwareCurrentActive,
 }: Props) {
   const theme = useTheme();
 
@@ -36,7 +40,9 @@ export function PowerOverviewCard({
             REAL-TIME POWER CONSUMPTION
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Active Appliance Load
+            {isHardwareCurrentActive
+              ? '⚡ Hardware Sensor: ACS712 (GPIO 34)'
+              : 'Active Appliance Load | Nominal Grid 230V'}
           </ThemedText>
         </View>
         <View
@@ -65,15 +71,22 @@ export function PowerOverviewCard({
 
         <View style={styles.subStatsCol}>
           <View style={styles.subStatItem}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Voltage
-            </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Grid Voltage
+              </ThemedText>
+            </View>
             <ThemedText type="smallBold">{voltage.toFixed(0)} V</ThemedText>
           </View>
           <View style={styles.subStatItem}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Current
-            </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Live Current
+              </ThemedText>
+              {(isHardwareCurrentActive || currentAmps > 0.05) && (
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#00E5FF' }} />
+              )}
+            </View>
             <ThemedText type="smallBold">{currentAmps.toFixed(2)} A</ThemedText>
           </View>
         </View>
