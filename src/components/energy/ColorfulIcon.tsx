@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
@@ -24,16 +23,16 @@ interface Props {
   style?: ViewStyle;
 }
 
-const gradientMap: Record<ColorfulVariant, [string, string]> = {
-  amber: ['#F59E0B', '#D97706'],
-  emerald: ['#10B981', '#059669'],
-  cyan: ['#0EA5E9', '#0284C7'],
-  violet: ['#8B5CF6', '#6D28D9'],
-  rose: ['#F43F5E', '#E11D48'],
-  blue: ['#3B82F6', '#2563EB'],
-  orange: ['#F97316', '#EA580C'],
-  slate: ['#64748B', '#475569'],
-  darkCosmic: ['#6366F1', '#4F46E5'],
+const colorMap: Record<ColorfulVariant, string> = {
+  amber: '#D97706',
+  emerald: '#059669',
+  cyan: '#0284C7',
+  violet: '#7C3AED',
+  rose: '#E11D48',
+  blue: '#2563EB',
+  orange: '#EA580C',
+  slate: '#475569',
+  darkCosmic: '#4F46E5',
 };
 
 export function ColorfulIcon({
@@ -44,19 +43,17 @@ export function ColorfulIcon({
   containerSize = 40,
   style,
 }: Props) {
-  const colors = gradientMap[variant];
+  const bg = colorMap[variant] || '#059669';
 
   return (
-    <LinearGradient
-      colors={colors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <View
       style={[
         styles.container,
         {
           width: containerSize,
           height: containerSize,
           borderRadius: Math.round(containerSize * 0.28),
+          backgroundColor: bg,
         },
         style,
       ]}>
@@ -73,7 +70,7 @@ export function ColorfulIcon({
           color="#FFFFFF"
         />
       )}
-    </LinearGradient>
+    </View>
   );
 }
 

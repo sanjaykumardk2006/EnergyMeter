@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Animated, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -40,13 +39,13 @@ export function RealisticBulb({ isOn, size = 38 }: Props) {
   const squircleRadius = Math.round(size * 0.28);
   const iconSize = Math.round(size * 0.52);
 
-  const bgColors: [string, string] = isOn
+  const bgColor = isOn
     ? isDark
-      ? ['#451A03', '#241002']
-      : ['#FEF3C7', '#FDE68A']
+      ? '#451A03'
+      : '#FEF3C7'
     : isDark
-    ? ['#1E293B', '#0F172A']
-    : ['#F8FAFC', '#F1F5F9'];
+    ? '#1E293B'
+    : '#F8FAFC';
 
   const borderColor = isOn
     ? isDark
@@ -65,16 +64,14 @@ export function RealisticBulb({ isOn, size = 38 }: Props) {
     : '#64748B';
 
   return (
-    <LinearGradient
-      colors={bgColors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <View
       style={[
         styles.squircle,
         {
           width: size,
           height: size,
           borderRadius: squircleRadius,
+          backgroundColor: bgColor,
           borderColor,
           shadowColor: isOn ? '#F59E0B' : 'transparent',
           shadowOpacity: isOn ? 0.18 : 0,
@@ -87,7 +84,7 @@ export function RealisticBulb({ isOn, size = 38 }: Props) {
           color={iconColor}
         />
       </Animated.View>
-    </LinearGradient>
+    </View>
   );
 }
 

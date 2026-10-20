@@ -13,6 +13,11 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
+    // Safety fallback: Ensure splash screen never hangs permanently
+    const splashTimer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 1500);
+
     async function checkForUpdates() {
       try {
         const update = await Updates.checkForUpdateAsync();
@@ -35,6 +40,8 @@ export default function TabLayout() {
     if (!__DEV__) {
       checkForUpdates();
     }
+
+    return () => clearTimeout(splashTimer);
   }, []);
 
   return (

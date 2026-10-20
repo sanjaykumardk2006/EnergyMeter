@@ -1,7 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/context/ThemeContext';
@@ -78,13 +77,10 @@ export function BottomNavBar({ activeTab, onSelectTab }: Props) {
             style={styles.tabItem}
             onPress={() => onSelectTab(key)}>
             {isActive ? (
-              <LinearGradient
-                colors={item.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.activeIconBadge}>
+              <View
+                style={[styles.activeIconBadge, { backgroundColor: item.color }]}>
                 <Ionicons name={item.iconActive} size={18} color="#FFFFFF" />
-              </LinearGradient>
+              </View>
             ) : (
               <View style={styles.inactiveIconWrapper}>
                 <Ionicons name={item.iconInactive} size={22} color={colors.textMuted} />
