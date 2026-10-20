@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/context/ThemeContext';
 import { ColorfulIcon } from './ColorfulIcon';
@@ -36,7 +37,9 @@ export function EnergyView({
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}>
       {/* Header Bar */}
-      <View style={styles.headerRow}>
+      <Animated.View
+        entering={FadeInDown.duration(320).delay(20)}
+        style={styles.headerRow}>
         <ColorfulIcon
           library="ionicons"
           name="analytics"
@@ -52,12 +55,15 @@ export function EnergyView({
             Real-time power consumption and expenditure
           </ThemedText>
         </View>
-      </View>
+      </Animated.View>
 
       {/* 2x2 Telemetry Grid with Colorful Badges */}
-      <View style={styles.metricsGrid}>
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(60)}
+        style={styles.metricsGrid}>
         {/* Voltage */}
-        <View
+        <Animated.View
+          entering={FadeInUp.duration(300).delay(100)}
           style={[
             styles.metricCard,
             { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -79,10 +85,11 @@ export function EnergyView({
           <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
             DC Supply
           </ThemedText>
-        </View>
+        </Animated.View>
 
         {/* Current */}
-        <View
+        <Animated.View
+          entering={FadeInUp.duration(300).delay(140)}
           style={[
             styles.metricCard,
             { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -104,10 +111,11 @@ export function EnergyView({
           <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
             Total Load
           </ThemedText>
-        </View>
+        </Animated.View>
 
         {/* Power */}
-        <View
+        <Animated.View
+          entering={FadeInUp.duration(300).delay(180)}
           style={[
             styles.metricCard,
             { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -129,10 +137,11 @@ export function EnergyView({
           <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
             Voltage × Current
           </ThemedText>
-        </View>
+        </Animated.View>
 
         {/* Energy */}
-        <View
+        <Animated.View
+          entering={FadeInUp.duration(300).delay(220)}
           style={[
             styles.metricCard,
             { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -154,19 +163,22 @@ export function EnergyView({
           <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
             Total Accumulation
           </ThemedText>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
 
       {/* Time Range Filter Buttons */}
-      <View style={[styles.filterRow, { backgroundColor: colors.segmentBg }]}>
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(130)}
+        style={[styles.filterRow, { backgroundColor: colors.segmentBg }]}>
         {(['Live', 'Daily', 'Weekly', 'Monthly'] as const).map((item) => {
           const isSelected = filter === item;
           return (
             <Pressable
               key={item}
-              style={[
+              style={({ pressed }) => [
                 styles.filterBtn,
                 isSelected && [styles.filterBtnActive, { backgroundColor: colors.primary }],
+                pressed && { transform: [{ scale: 0.95 }], opacity: 0.8 },
               ]}
               onPress={() => setFilter(item)}>
               <ThemedText
@@ -180,13 +192,17 @@ export function EnergyView({
             </Pressable>
           );
         })}
-      </View>
+      </Animated.View>
 
       {/* Power Consumption (W) Chart */}
-      <PowerConsumptionChart currentPowerWatts={powerWatts} />
+      <Animated.View entering={FadeInDown.duration(340).delay(180)}>
+        <PowerConsumptionChart currentPowerWatts={powerWatts} />
+      </Animated.View>
 
       {/* Bottom Summary Stats Cards with Colorful Icons */}
-      <View style={styles.bottomStatsRow}>
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(230)}
+        style={styles.bottomStatsRow}>
         {/* Estimated Cost Card */}
         <View
           style={[
@@ -238,7 +254,7 @@ export function EnergyView({
             </ThemedText>
           </View>
         </View>
-      </View>
+      </Animated.View>
     </ScrollView>
   );
 }

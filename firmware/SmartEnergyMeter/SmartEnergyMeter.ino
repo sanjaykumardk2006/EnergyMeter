@@ -209,6 +209,7 @@ void saveEnergyToFlash() {
   preferences.putBool("auto_mode", auto_mode);
   preferences.putInt("target", auto_target);
   preferences.putInt("delay_sec", auto_off_delay_sec);
+  preferences.putFloat("dist_thresh", occupancy_dist_threshold_cm);
   preferences.putFloat("calib_i", acs_calib_factor);
   preferences.putFloat("acs_sens", acs_sensitivity);
   preferences.end();
@@ -223,6 +224,7 @@ void loadEnergyFromFlash() {
   auto_mode = preferences.getBool("auto_mode", false);
   auto_target = preferences.getInt("target", 3);
   auto_off_delay_sec = preferences.getInt("delay_sec", 300);
+  occupancy_dist_threshold_cm = preferences.getFloat("dist_thresh", 120.0);
   acs_calib_factor = preferences.getFloat("calib_i", 1.0);
   acs_sensitivity = preferences.getFloat("acs_sens", 0.100);
   preferences.end();
@@ -269,6 +271,7 @@ void handleGetStatus() {
   json += "\"ir_detected\":" + String(ir_detected ? "true" : "false") + ",";
   json += "\"distance_cm\":" + String(distance_cm >= 0 ? distance_cm : 0.0, 1) + ",";
   json += "\"distance_valid\":" + String(distance_valid ? "true" : "false") + ",";
+  json += "\"occupancy_dist_threshold_cm\":" + String(occupancy_dist_threshold_cm, 1) + ",";
   json += "\"voltage\":" + String(grid_voltage, 2) + ",";
   json += "\"current_amps\":" + String(current_amps, 3) + ",";
   json += "\"power_watts\":" + String(current_power_watts, 2) + ",";
@@ -357,7 +360,17 @@ void handlePostAutoMode() {
     }
   }
 
-  last_action_reason = auto_mode ? "Auto Mode Activated (Target: Load " + String(auto_target) + ")" : "Manual Mode Activated (Automation Locked)";
+  if (auto_mode) {
+    if (!occupancy_detected) {
+      setRelay(1, false);
+      setRelay(2, false);
+      last_action_reason = "Auto Mode: All sensors clear -> All Loads OFF";
+    } else {
+      last_action_reason = "Auto Mode Activated (Target: Load " + String(auto_target) + ")";
+    }
+  } else {
+    last_action_reason = "Manual Mode Activated (Automation Locked)";
+  }
   saveEnergyToFlash();
   server.send(200, "application/json", "{\"success\":true,\"auto_mode\":" + String(auto_mode ? "true" : "false") + ",\"auto_target\":" + String(auto_target) + "}");
 }
@@ -371,6 +384,7 @@ void handlePostConfig() {
   if (server.hasArg("tariff")) tariff_rate = server.arg("tariff").toFloat();
   if (server.hasArg("delay")) auto_off_delay_sec = server.arg("delay").toInt();
   if (server.hasArg("target")) auto_target = server.arg("target").toInt();
+  if (server.hasArg("dist_threshold")) occupancy_dist_threshold_cm = server.arg("dist_threshold").toFloat();
   if (server.hasArg("calib_i")) acs_calib_factor = server.arg("calib_i").toFloat();
   if (server.hasArg("acs_sens")) acs_sensitivity = server.arg("acs_sens").toFloat();
 
@@ -382,6 +396,8 @@ void handlePostConfig() {
     if ((i = b.indexOf("\"tariff\":")) != -1) tariff_rate = b.substring(i + 9).toFloat();
     if ((i = b.indexOf("\"delay\":")) != -1) auto_off_delay_sec = b.substring(i + 8).toInt();
     if ((i = b.indexOf("\"target\":")) != -1) auto_target = b.substring(i + 9).toInt();
+    if ((i = b.indexOf("\"dist_threshold\":")) != -1) occupancy_dist_threshold_cm = b.substring(i + 17).toFloat();
+    if ((i = b.indexOf("\"occupancy_dist_threshold_cm\":")) != -1) occupancy_dist_threshold_cm = b.substring(i + 30).toFloat();
     if ((i = b.indexOf("\"calib_i\":")) != -1) acs_calib_factor = b.substring(i + 10).toFloat();
     if ((i = b.indexOf("\"acs_sens\":")) != -1) acs_sensitivity = b.substring(i + 11).toFloat();
   }
@@ -555,7 +571,7 @@ void loop() {
     distance_cm = measureDistanceCm(distance_valid);
 
     // Multi-sensor evidence fusion:
-    // PIR motion OR IR obstacle OR Ultrasonic valid proximity (< 120cm)
+    // PIR motion OR IR obstacle OR Ultrasonic valid proximity (<= occupancy_dist_threshold_cm)
     bool ultrasonic_near = distance_valid && (distance_cm >= 3.0f && distance_cm <= occupancy_dist_threshold_cm);
     occupancy_detected = pir_motion || ir_detected || ultrasonic_near;
 
@@ -598,31 +614,18 @@ void loop() {
           }
         }
       } else {
-        // Room vacant: evaluate no-occupancy timeout
+        // Room vacant: IR, Ultrasonic, and PIR sensors detect nothing!
+        // In Smart Control mode, when no sensors detect presence, all loads MUST turn OFF.
         unsigned long idle_sec = (now - last_motion_timestamp) / 1000;
 
-        if (idle_sec >= (unsigned long)auto_off_delay_sec) {
-          if (now - last_relay_switch_ms >= MIN_SWITCH_INTERVAL_MS) {
-            bool need_action = false;
-            String reason = "Auto: Vacancy timeout (" + String(auto_off_delay_sec) + "s) -> ";
-
-            if (auto_target == 1 && relay1_on) {
-              setRelay(1, false);
-              last_action_reason = reason + "Load 1 OFF";
-              need_action = true;
-            } else if (auto_target == 2 && relay2_on) {
-              setRelay(2, false);
-              last_action_reason = reason + "Load 2 OFF";
-              need_action = true;
-            } else if (auto_target == 3 && (relay1_on || relay2_on)) {
+        // Cut off if vacancy timeout elapsed (or immediate if auto_off_delay_sec <= 5)
+        if (auto_off_delay_sec <= 5 || idle_sec >= (unsigned long)auto_off_delay_sec) {
+          if (relay1_on || relay2_on) {
+            if (now - last_relay_switch_ms >= 1000) {
               setRelay(1, false);
               setRelay(2, false);
-              last_action_reason = reason + "Both Loads OFF";
-              need_action = true;
-            }
-
-            if (need_action) {
               last_relay_switch_ms = now;
+              last_action_reason = "Auto: All sensors clear (PIR, IR & Ultrasonic) -> All Loads OFF";
               Serial.println(last_action_reason);
             }
           }

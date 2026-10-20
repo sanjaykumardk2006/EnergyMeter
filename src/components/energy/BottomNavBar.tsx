@@ -1,7 +1,14 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -52,6 +59,67 @@ const tabConfig: Record<
   },
 };
 
+function NavTabItem({
+  item,
+  isActive,
+  onPress,
+  colors,
+}: {
+  item: (typeof tabConfig)[TabKey];
+  isActive: boolean;
+  onPress: () => void;
+  colors: any;
+}) {
+  const iconScale = useSharedValue(isActive ? 1.1 : 1.0);
+
+  useEffect(() => {
+    iconScale.value = withSpring(isActive ? 1.12 : 1.0, {
+      damping: 14,
+      stiffness: 240,
+    });
+  }, [isActive, iconScale]);
+
+  const animatedIconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
+  }));
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.tabItem,
+        pressed && styles.tabItemPressed,
+      ]}
+      onPress={onPress}>
+      <Animated.View style={[styles.iconContainer, animatedIconStyle]}>
+        <Ionicons
+          name={isActive ? item.iconActive : item.iconInactive}
+          size={22}
+          color={isActive ? item.color : colors.textMuted}
+        />
+      </Animated.View>
+
+      <ThemedText
+        style={[
+          styles.tabLabel,
+          { color: isActive ? item.color : colors.textSecondary },
+          isActive && styles.tabLabelActive,
+        ]}>
+        {item.label}
+      </ThemedText>
+
+      {isActive ? (
+        <Animated.View
+          entering={FadeIn.duration(180)}
+          exiting={FadeOut.duration(100)}
+          style={[styles.activeDot, { backgroundColor: item.color }]}
+        />
+      ) : (
+        <View style={styles.dotSpacer} />
+      )}
+    </Pressable>
+  );
+}
+
 export function BottomNavBar({ activeTab, onSelectTab }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -72,30 +140,13 @@ export function BottomNavBar({ activeTab, onSelectTab }: Props) {
         const item = tabConfig[key];
         const isActive = activeTab === key;
         return (
-          <Pressable
+          <NavTabItem
             key={key}
-            style={styles.tabItem}
-            onPress={() => onSelectTab(key)}>
-            {isActive ? (
-              <View
-                style={[styles.activeIconBadge, { backgroundColor: item.color }]}>
-                <Ionicons name={item.iconActive} size={18} color="#FFFFFF" />
-              </View>
-            ) : (
-              <View style={styles.inactiveIconWrapper}>
-                <Ionicons name={item.iconInactive} size={22} color={colors.textMuted} />
-              </View>
-            )}
-
-            <ThemedText
-              style={[
-                styles.tabLabel,
-                { color: isActive ? item.color : colors.textSecondary },
-                isActive && styles.tabLabelActive,
-              ]}>
-              {item.label}
-            </ThemedText>
-          </Pressable>
+            item={item}
+            isActive={isActive}
+            onPress={() => onSelectTab(key)}
+            colors={colors}
+          />
         );
       })}
     </View>
@@ -119,24 +170,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    paddingVertical: 4,
     gap: 2,
   },
-  activeIconBadge: {
-    width: 38,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
+  tabItemPressed: {
+    transform: [{ scale: 0.94 }],
+    opacity: 0.8,
   },
-  inactiveIconWrapper: {
-    width: 38,
-    height: 32,
-    borderRadius: 10,
+  iconContainer: {
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -145,6 +187,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tabLabelActive: {
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 2,
+  },
+  dotSpacer: {
+    width: 4,
+    height: 4,
+    marginTop: 2,
   },
 });

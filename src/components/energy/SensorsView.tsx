@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/context/ThemeContext';
 import { ColorfulIcon } from './ColorfulIcon';
@@ -10,6 +10,10 @@ interface Props {
   distanceCm: number;
   distanceValid: boolean;
   currentAmps: number;
+  autoMode?: boolean;
+  relay1?: boolean;
+  relay2?: boolean;
+  onSimulateSensorTrigger?: (sensor: 'pir' | 'ir' | 'ultrasonic' | 'clear') => void;
 }
 
 export function SensorsView({
@@ -18,9 +22,15 @@ export function SensorsView({
   distanceCm,
   distanceValid,
   currentAmps,
+  autoMode = false,
+  relay1 = false,
+  relay2 = false,
+  onSimulateSensorTrigger,
 }: Props) {
   const { colors, isDark } = useTheme();
   const isNearby = distanceValid && distanceCm > 0 && distanceCm < 120;
+  const distPercent = distanceValid ? Math.min(100, Math.max(4, (distanceCm / 200) * 100)) : 0;
+  const isOccupied = pirMotion || irDetected || isNearby;
 
   return (
     <ScrollView
@@ -28,7 +38,9 @@ export function SensorsView({
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}>
       {/* Header Bar */}
-      <View style={styles.headerRow}>
+      <Animated.View
+        entering={FadeInDown.duration(320).delay(20)}
+        style={styles.headerRow}>
         <ColorfulIcon
           library="ionicons"
           name="hardware-chip"
@@ -44,11 +56,133 @@ export function SensorsView({
             Multi-sensor hardware telemetry from ESP32
           </ThemedText>
         </View>
-      </View>
+      </Animated.View>
+
+      {/* Smart Control Automation Logic Status Banner */}
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(50)}
+        style={[
+          styles.ruleBanner,
+          {
+            backgroundColor: isOccupied
+              ? isDark
+                ? 'rgba(16, 185, 129, 0.15)'
+                : '#ECFDF5'
+              : isDark
+              ? 'rgba(239, 68, 68, 0.12)'
+              : '#FEF2F2',
+            borderColor: isOccupied
+              ? colors.primaryBorder
+              : isDark
+              ? 'rgba(239, 68, 68, 0.35)'
+              : '#FECACA',
+          },
+        ]}>
+        <View style={styles.ruleBannerContent}>
+          <ColorfulIcon
+            library="material"
+            name={isOccupied ? 'motion-sensor' : 'sleep'}
+            variant={isOccupied ? 'emerald' : 'rose'}
+            size={20}
+            containerSize={38}
+          />
+          <View style={{ flex: 1 }}>
+            <ThemedText
+              style={[
+                styles.ruleBannerTitle,
+                { color: isOccupied ? colors.primary : '#EF4444' },
+              ]}>
+              {isOccupied
+                ? 'Presence Detected • Smart Lights Active'
+                : 'All Sensors Clear • Loads Automatically OFF'}
+            </ThemedText>
+            <ThemedText
+              style={[
+                styles.ruleBannerSub,
+                { color: isOccupied ? colors.primaryHover : colors.textMuted },
+              ]}>
+              {autoMode
+                ? isOccupied
+                  ? `Sensors active -> Light 1 ${relay1 ? 'ON (Glowing)' : 'OFF'}, Light 2 ${relay2 ? 'ON (Glowing)' : 'OFF'}`
+                  : 'PIR, IR & HC-SR04 detect nothing -> Auto-cutoff turned all loads OFF.'
+                : `Manual Mode Active -> Light 1: ${relay1 ? 'ON' : 'OFF'}, Light 2: ${relay2 ? 'ON' : 'OFF'}`}
+            </ThemedText>
+          </View>
+        </View>
+
+        {onSimulateSensorTrigger && (
+          <View style={[styles.testRow, { borderTopColor: colors.divider }]}>
+            <ThemedText style={[styles.testHeading, { color: colors.textSecondary }]}>
+              Simulate Sensors:
+            </ThemedText>
+            <View style={styles.testButtons}>
+              <Pressable
+                style={[
+                  styles.testBtn,
+                  pirMotion
+                    ? { backgroundColor: '#7C3AED', borderColor: '#A78BFA' }
+                    : { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                ]}
+                onPress={() => onSimulateSensorTrigger('pir')}>
+                <ThemedText
+                  style={[
+                    styles.testBtnText,
+                    { color: pirMotion ? '#FFFFFF' : colors.textSecondary },
+                  ]}>
+                  PIR {pirMotion ? 'ON' : 'OFF'}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.testBtn,
+                  irDetected
+                    ? { backgroundColor: '#E11D48', borderColor: '#FDA4AF' }
+                    : { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                ]}
+                onPress={() => onSimulateSensorTrigger('ir')}>
+                <ThemedText
+                  style={[
+                    styles.testBtnText,
+                    { color: irDetected ? '#FFFFFF' : colors.textSecondary },
+                  ]}>
+                  IR {irDetected ? 'ON' : 'OFF'}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.testBtn,
+                  distanceCm > 0 && distanceCm <= 50
+                    ? { backgroundColor: '#0284C7', borderColor: '#7DD3FC' }
+                    : { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                ]}
+                onPress={() => onSimulateSensorTrigger('ultrasonic')}>
+                <ThemedText
+                  style={[
+                    styles.testBtnText,
+                    { color: distanceCm > 0 && distanceCm <= 50 ? '#FFFFFF' : colors.textSecondary },
+                  ]}>
+                  US {distanceCm > 0 && distanceCm <= 50 ? 'Near' : 'Far'}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                style={[styles.testBtn, { backgroundColor: '#DC2626', borderColor: '#FCA5A5' }]}
+                onPress={() => onSimulateSensorTrigger('clear')}>
+                <ThemedText style={[styles.testBtnText, { color: '#FFFFFF', fontWeight: '700' }]}>
+                  Clear All
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </Animated.View>
 
       <View style={styles.cardsList}>
         {/* 1. PIR Motion Sensor Card */}
-        <View
+        <Animated.View
+          entering={FadeInDown.duration(340).delay(60)}
           style={[
             styles.sensorCard,
             { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -103,10 +237,11 @@ export function SensorsView({
               Live Telemetry
             </ThemedText>
           </View>
-        </View>
+        </Animated.View>
 
         {/* 2. IR Sensor Card */}
-        <View
+        <Animated.View
+          entering={FadeInDown.duration(340).delay(110)}
           style={[
             styles.sensorCard,
             { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -161,10 +296,11 @@ export function SensorsView({
               Live Telemetry
             </ThemedText>
           </View>
-        </View>
+        </Animated.View>
 
         {/* 3. Ultrasonic Sensor Card */}
-        <View
+        <Animated.View
+          entering={FadeInDown.duration(340).delay(160)}
           style={[
             styles.sensorCard,
             { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -203,6 +339,31 @@ export function SensorsView({
             </View>
           </View>
 
+          {/* Proximity Gauge Bar */}
+          <View style={styles.gaugeContainer}>
+            <View style={[styles.gaugeTrack, { backgroundColor: isDark ? colors.inputBg : '#E2E8F0' }]}>
+              <View
+                style={[
+                  styles.gaugeFill,
+                  {
+                    width: `${distPercent}%`,
+                    backgroundColor: !distanceValid
+                      ? colors.textMuted
+                      : distanceCm < 50
+                      ? '#EF4444'
+                      : distanceCm < 120
+                      ? '#0284C7'
+                      : '#10B981',
+                  },
+                ]}
+              />
+            </View>
+            <View style={styles.gaugeLabels}>
+              <ThemedText style={[styles.gaugeSub, { color: colors.textMuted }]}>0 cm (Near)</ThemedText>
+              <ThemedText style={[styles.gaugeSub, { color: colors.textMuted }]}>200 cm (Far)</ThemedText>
+            </View>
+          </View>
+
           <View style={[styles.cardFooter, { borderTopColor: colors.divider }]}>
             <ThemedText style={[styles.footerValText, { color: colors.textSecondary }]}>
               {distanceValid
@@ -215,10 +376,11 @@ export function SensorsView({
               Live Telemetry
             </ThemedText>
           </View>
-        </View>
+        </Animated.View>
 
         {/* 4. ACS712 Current Sensor Card */}
-        <View
+        <Animated.View
+          entering={FadeInDown.duration(340).delay(210)}
           style={[
             styles.sensorCard,
             { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -265,7 +427,7 @@ export function SensorsView({
               Live Telemetry
             </ThemedText>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </ScrollView>
   );
@@ -351,5 +513,71 @@ const styles = StyleSheet.create({
   footerTimeText: {
     fontSize: 11,
     fontWeight: '500',
+  },
+  gaugeContainer: {
+    gap: 6,
+    paddingVertical: 4,
+  },
+  gaugeTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  gaugeFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  gaugeLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  gaugeSub: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  ruleBanner: {
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  ruleBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ruleBannerTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  ruleBannerSub: {
+    fontSize: 11.5,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  testRow: {
+    paddingTop: 10,
+    borderTopWidth: 1,
+    gap: 8,
+  },
+  testHeading: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  testButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  testBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  testBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

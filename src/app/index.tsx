@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Platform, StatusBar, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { BottomNavBar, TabKey } from '@/components/energy/BottomNavBar';
 import { EnergyView } from '@/components/energy/EnergyView';
@@ -41,6 +43,7 @@ function MainAppContent() {
     resetEnergy,
     refresh,
     connectToIp,
+    simulateSensorTrigger,
   } = useEnergyMeter();
 
   const voltage = status?.voltage ?? 5.0; // 5V DC Nominal
@@ -59,9 +62,10 @@ function MainAppContent() {
   const autoMode = status?.auto_mode ?? false;
   const autoTarget = status?.auto_target ?? 3;
   const autoOffDelaySec = status?.auto_off_delay_sec ?? 300;
+  const occupancyDistThresholdCm = status?.occupancy_dist_threshold_cm ?? 50;
   const occupancyDetected =
     status?.occupancy_detected ??
-    (pirMotion || irDetected || (distanceValid && distanceCm > 0 && distanceCm < 120));
+    (pirMotion || irDetected || (distanceValid && distanceCm > 0 && distanceCm <= occupancyDistThresholdCm));
   const lastActionReason = status?.last_action_reason;
 
   return (
@@ -78,74 +82,108 @@ function MainAppContent() {
         ]}>
         {/* Tab 1: Home Dashboard (Screen 1: Manual Control & Screen 2: Smart Control) */}
         {activeTab === 'home' && (
-          <HomeDashboardView
-            autoMode={autoMode}
-            occupancyDetected={occupancyDetected}
-            relay1={relay1}
-            relay2={relay2}
-            voltage={voltage}
-            currentAmps={currentAmps}
-            powerWatts={powerWatts}
-            totalKwh={totalKwh}
-            autoOffDelaySec={autoOffDelaySec}
-            ipAddress={ipAddress}
-            isConnected={isConnected}
-            isConnecting={isConnecting}
-            isRefreshing={isRefreshing}
-            isLoading={isLoading}
-            lastUpdated={lastUpdated}
-            onConnect={connectToIp}
-            onRefresh={refresh}
-            onSetAutoMode={setAutoMode}
-            onToggleAutoMode={toggleAutoMode}
-            onToggleRelay1={() => toggleRelay(1)}
-            onToggleRelay2={() => toggleRelay(2)}
-            onOpenLoadDetail={(id) => setLoadDetailModal({ visible: true, loadId: id })}
-            onOpenSettings={() => setActiveTab('settings')}
-            onOpenSystemStatus={() => setSystemStatusVisible(true)}
-          />
+          <Animated.View
+            key="tab-home"
+            entering={FadeIn.duration(240)}
+            exiting={FadeOut.duration(150)}
+            style={styles.tabAnimatedWrapper}>
+            <HomeDashboardView
+              autoMode={autoMode}
+              occupancyDetected={occupancyDetected}
+              relay1={relay1}
+              relay2={relay2}
+              voltage={voltage}
+              currentAmps={currentAmps}
+              powerWatts={powerWatts}
+              totalKwh={totalKwh}
+              autoOffDelaySec={autoOffDelaySec}
+              ipAddress={ipAddress}
+              isConnected={isConnected}
+              isConnecting={isConnecting}
+              isRefreshing={isRefreshing}
+              isLoading={isLoading}
+              lastUpdated={lastUpdated}
+              pirMotion={pirMotion}
+              irDetected={irDetected}
+              distanceCm={distanceCm}
+              distanceValid={distanceValid}
+              onConnect={connectToIp}
+              onRefresh={refresh}
+              onSetAutoMode={setAutoMode}
+              onToggleAutoMode={toggleAutoMode}
+              onToggleRelay1={() => toggleRelay(1)}
+              onToggleRelay2={() => toggleRelay(2)}
+              onOpenLoadDetail={(id) => setLoadDetailModal({ visible: true, loadId: id })}
+              onOpenSettings={() => setActiveTab('settings')}
+              onOpenSystemStatus={() => setSystemStatusVisible(true)}
+              onSimulateSensorTrigger={simulateSensorTrigger}
+            />
+          </Animated.View>
         )}
 
         {/* Tab 2: Sensors Page (Screen 3) */}
         {activeTab === 'sensors' && (
-          <SensorsView
-            pirMotion={pirMotion}
-            irDetected={irDetected}
-            distanceCm={distanceCm}
-            distanceValid={distanceValid}
-            currentAmps={currentAmps}
-          />
+          <Animated.View
+            key="tab-sensors"
+            entering={FadeIn.duration(240)}
+            exiting={FadeOut.duration(150)}
+            style={styles.tabAnimatedWrapper}>
+            <SensorsView
+              pirMotion={pirMotion}
+              irDetected={irDetected}
+              distanceCm={distanceCm}
+              distanceValid={distanceValid}
+              currentAmps={currentAmps}
+              autoMode={autoMode}
+              relay1={relay1}
+              relay2={relay2}
+              onSimulateSensorTrigger={simulateSensorTrigger}
+            />
+          </Animated.View>
         )}
 
         {/* Tab 3: Energy Monitoring Page (Screen 4) */}
         {activeTab === 'energy' && (
-          <EnergyView
-            voltage={voltage}
-            currentAmps={currentAmps}
-            powerWatts={powerWatts}
-            totalKwh={totalKwh}
-            costEstimate={costEstimate}
-            tariffRate={tariffRate}
-          />
+          <Animated.View
+            key="tab-energy"
+            entering={FadeIn.duration(240)}
+            exiting={FadeOut.duration(150)}
+            style={styles.tabAnimatedWrapper}>
+            <EnergyView
+              voltage={voltage}
+              currentAmps={currentAmps}
+              powerWatts={powerWatts}
+              totalKwh={totalKwh}
+              costEstimate={costEstimate}
+              tariffRate={tariffRate}
+            />
+          </Animated.View>
         )}
 
         {/* Tab 4: Settings Page (Screen 5) */}
         {activeTab === 'settings' && (
-          <SettingsView
-            autoMode={autoMode}
-            autoTarget={autoTarget}
-            autoOffDelaySec={autoOffDelaySec}
-            ipAddress={ipAddress}
-            tariffRate={tariffRate}
-            voltage={voltage}
-            onToggleAutoMode={toggleAutoMode}
-            onUpdateTarget={(target) => setAutoMode(true, target)}
-            onUpdateDelay={(delay) => updateConfig({ auto_off_delay_sec: delay })}
-            onSaveConfig={updateConfig}
-            onResetEnergy={resetEnergy}
-            onIpChange={setIpAddress}
-            onOpenSystemStatus={() => setSystemStatusVisible(true)}
-          />
+          <Animated.View
+            key="tab-settings"
+            entering={FadeIn.duration(240)}
+            exiting={FadeOut.duration(150)}
+            style={styles.tabAnimatedWrapper}>
+            <SettingsView
+              autoMode={autoMode}
+              autoTarget={autoTarget}
+              autoOffDelaySec={autoOffDelaySec}
+              occupancyDistThresholdCm={occupancyDistThresholdCm}
+              ipAddress={ipAddress}
+              tariffRate={tariffRate}
+              voltage={voltage}
+              onToggleAutoMode={toggleAutoMode}
+              onUpdateTarget={(target) => setAutoMode(true, target)}
+              onUpdateDelay={(delay) => updateConfig({ auto_off_delay_sec: delay })}
+              onSaveConfig={updateConfig}
+              onResetEnergy={resetEnergy}
+              onIpChange={setIpAddress}
+              onOpenSystemStatus={() => setSystemStatusVisible(true)}
+            />
+          </Animated.View>
         )}
       </View>
 
@@ -193,6 +231,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
+    flex: 1,
+  },
+  tabAnimatedWrapper: {
     flex: 1,
   },
 });

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/context/ThemeContext';
 import { ColorfulIcon } from './ColorfulIcon';
@@ -19,9 +21,10 @@ interface Props {
   autoMode: boolean;
   autoTarget: 1 | 2 | 3;
   autoOffDelaySec: number;
+  occupancyDistThresholdCm?: number;
   ipAddress: string;
   tariffRate: number;
-  voltage: number;
+  voltage?: number;
   onToggleAutoMode: () => void;
   onUpdateTarget: (target: 1 | 2 | 3) => void;
   onUpdateDelay: (delaySec: number) => void;
@@ -35,9 +38,9 @@ export function SettingsView({
   autoMode,
   autoTarget,
   autoOffDelaySec,
+  occupancyDistThresholdCm,
   ipAddress,
   tariffRate,
-  voltage,
   onToggleAutoMode,
   onUpdateTarget,
   onUpdateDelay,
@@ -48,66 +51,223 @@ export function SettingsView({
 }: Props) {
   const { colors, isDark, setTheme, toggleTheme } = useTheme();
   const [timeoutMins, setTimeoutMins] = useState(Math.max(1, Math.round(autoOffDelaySec / 60)));
-  const [distanceThreshold, setDistanceThreshold] = useState(50);
+  const [distanceThreshold, setDistanceThreshold] = useState(occupancyDistThresholdCm ?? 50);
+  const [distInputStr, setDistInputStr] = useState(String(occupancyDistThresholdCm ?? 50));
+  const [selectedTarget, setSelectedTarget] = useState<1 | 2 | 3>(autoTarget);
   const [tempIp, setTempIp] = useState(ipAddress);
   const [tempTariff, setTempTariff] = useState(String(tariffRate));
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Individual setting update states
+  const [isSavingTimeout, setIsSavingTimeout] = useState(false);
+  const [timeoutStatus, setTimeoutStatus] = useState<string | null>(null);
+
+  const [isSavingDist, setIsSavingDist] = useState(false);
+  const [distStatus, setDistStatus] = useState<string | null>(null);
+
+  const [isSavingTarget, setIsSavingTarget] = useState(false);
+  const [targetStatus, setTargetStatus] = useState<string | null>(null);
+
+  const [isSavingIp, setIsSavingIp] = useState(false);
+  const [ipStatus, setIpStatus] = useState<string | null>(null);
+
+  const [isSavingTariff, setIsSavingTariff] = useState(false);
+  const [tariffStatus, setTariffStatus] = useState<string | null>(null);
+
+  // Keep local state in sync when remote props change
+  useEffect(() => {
+    if (occupancyDistThresholdCm !== undefined) {
+      setDistanceThreshold(occupancyDistThresholdCm);
+      setDistInputStr(String(occupancyDistThresholdCm));
+    }
+  }, [occupancyDistThresholdCm]);
+
+  useEffect(() => {
+    setSelectedTarget(autoTarget);
+  }, [autoTarget]);
+
+  useEffect(() => {
+    setTimeoutMins(Math.max(1, Math.round(autoOffDelaySec / 60)));
+  }, [autoOffDelaySec]);
 
   // Stepper handlers
   const handleDecTimeout = () => {
     if (timeoutMins > 1) {
-      const next = timeoutMins - 1;
-      setTimeoutMins(next);
-      onUpdateDelay(next * 60);
+      setTimeoutMins((prev) => prev - 1);
     }
   };
 
   const handleIncTimeout = () => {
     if (timeoutMins < 60) {
-      const next = timeoutMins + 1;
-      setTimeoutMins(next);
-      onUpdateDelay(next * 60);
+      setTimeoutMins((prev) => prev + 1);
     }
   };
 
+  // Distance Threshold manual handlers
+  const handleDistTextChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    setDistInputStr(cleaned);
+    const parsed = parseInt(cleaned, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      setDistanceThreshold(Math.min(200, parsed));
+    }
+  };
+
+  const handleDistBlur = () => {
+    const parsed = parseInt(distInputStr, 10);
+    if (isNaN(parsed) || parsed < 10) {
+      setDistanceThreshold(10);
+      setDistInputStr('10');
+    } else if (parsed > 200) {
+      setDistanceThreshold(200);
+      setDistInputStr('200');
+    } else {
+      setDistanceThreshold(parsed);
+      setDistInputStr(String(parsed));
+    }
+  };
+
+  const handleDecDist = () => {
+    const next = Math.max(10, distanceThreshold - 10);
+    setDistanceThreshold(next);
+    setDistInputStr(String(next));
+  };
+
+  const handleIncDist = () => {
+    const next = Math.min(200, distanceThreshold + 10);
+    setDistanceThreshold(next);
+    setDistInputStr(String(next));
+  };
+
   // Target checkboxes
-  const controlLoad1 = autoTarget === 1 || autoTarget === 3;
-  const controlLoad2 = autoTarget === 2 || autoTarget === 3;
+  const controlLoad1 = selectedTarget === 1 || selectedTarget === 3;
+  const controlLoad2 = selectedTarget === 2 || selectedTarget === 3;
 
   const toggleControlLoad1 = () => {
     if (controlLoad1 && controlLoad2) {
-      onUpdateTarget(2); // keep only load 2
+      setSelectedTarget(2); // keep only load 2
     } else if (!controlLoad1 && controlLoad2) {
-      onUpdateTarget(3); // both
+      setSelectedTarget(3); // both
     } else {
-      onUpdateTarget(1);
+      setSelectedTarget(1);
     }
   };
 
   const toggleControlLoad2 = () => {
     if (controlLoad1 && controlLoad2) {
-      onUpdateTarget(1); // keep only load 1
+      setSelectedTarget(1); // keep only load 1
     } else if (controlLoad1 && !controlLoad2) {
-      onUpdateTarget(3); // both
+      setSelectedTarget(3); // both
     } else {
-      onUpdateTarget(2);
+      setSelectedTarget(2);
     }
   };
 
-  const handleSaveAll = async () => {
-    const tariff = parseFloat(tempTariff);
-    const ok = await onSaveConfig({
-      auto_off_delay_sec: timeoutMins * 60,
-      auto_target: autoTarget,
-      tariff_rate: isNaN(tariff) ? 8.0 : tariff,
-    });
-    if (ok) {
-      setSaveStatus('✓ Settings saved to ESP32 Flash!');
-      setTimeout(() => setSaveStatus(null), 3000);
-    } else {
-      setSaveStatus('❌ Failed to save configuration');
+
+  // 1. Update Timeout individually
+  const handleUpdateTimeout = async () => {
+    setIsSavingTimeout(true);
+    setTimeoutStatus(null);
+    try {
+      const ok = await onSaveConfig({ auto_off_delay_sec: timeoutMins * 60 });
+      if (ok) {
+        onUpdateDelay(timeoutMins * 60);
+        setTimeoutStatus(`✓ Timeout set to ${timeoutMins} min!`);
+        setTimeout(() => setTimeoutStatus(null), 3000);
+      } else {
+        setTimeoutStatus('❌ Failed to update timeout');
+      }
+    } catch {
+      setTimeoutStatus('❌ Error updating timeout');
+    } finally {
+      setIsSavingTimeout(false);
     }
   };
+
+  // 2. Update Distance Threshold individually
+  const handleUpdateDistance = async () => {
+    setIsSavingDist(true);
+    setDistStatus(null);
+    try {
+      const ok = await onSaveConfig({
+        dist_threshold_cm: distanceThreshold,
+        occupancy_dist_threshold_cm: distanceThreshold,
+      });
+      if (ok) {
+        setDistStatus(`✓ Distance set to ${distanceThreshold} cm!`);
+        setTimeout(() => setDistStatus(null), 3000);
+      } else {
+        setDistStatus('❌ Failed to update distance');
+      }
+    } catch {
+      setDistStatus('❌ Error updating distance');
+    } finally {
+      setIsSavingDist(false);
+    }
+  };
+
+  // 3. Update Target Lights individually
+  const handleUpdateTarget = async () => {
+    setIsSavingTarget(true);
+    setTargetStatus(null);
+    try {
+      const ok = await onSaveConfig({ auto_target: selectedTarget });
+      if (ok) {
+        onUpdateTarget(selectedTarget);
+        const targetLabel =
+          selectedTarget === 3 ? 'Both Lights' : selectedTarget === 1 ? 'Light 1' : 'Light 2';
+        setTargetStatus(`✓ Target set to ${targetLabel}!`);
+        setTimeout(() => setTargetStatus(null), 3000);
+      } else {
+        setTargetStatus('❌ Failed to update target lights');
+      }
+    } catch {
+      setTargetStatus('❌ Error updating target');
+    } finally {
+      setIsSavingTarget(false);
+    }
+  };
+
+  // 4. Update IP Address individually
+  const handleUpdateIp = () => {
+    setIsSavingIp(true);
+    setIpStatus(null);
+    const clean = tempIp.trim();
+    if (!clean) {
+      setIpStatus('❌ Please enter a valid IP');
+      setIsSavingIp(false);
+      return;
+    }
+    onIpChange(clean);
+    setIpStatus(`✓ ESP32 IP set to ${clean}`);
+    setTimeout(() => setIpStatus(null), 3000);
+    setIsSavingIp(false);
+  };
+
+  // 5. Update Tariff Rate individually
+  const handleUpdateTariff = async () => {
+    setIsSavingTariff(true);
+    setTariffStatus(null);
+    const val = parseFloat(tempTariff);
+    if (isNaN(val) || val < 0) {
+      setTariffStatus('❌ Please enter a valid tariff rate');
+      setIsSavingTariff(false);
+      return;
+    }
+    try {
+      const ok = await onSaveConfig({ tariff_rate: val });
+      if (ok) {
+        setTariffStatus(`✓ Tariff set to ₹${val.toFixed(2)}/kWh!`);
+        setTimeout(() => setTariffStatus(null), 3000);
+      } else {
+        setTariffStatus('❌ Failed to save tariff');
+      }
+    } catch {
+      setTariffStatus('❌ Error saving tariff');
+    } finally {
+      setIsSavingTariff(false);
+    }
+  };
+
 
   const handleResetConfirm = async () => {
     const doReset = async () => {
@@ -141,7 +301,9 @@ export function SettingsView({
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}>
       {/* Header Bar */}
-      <View style={styles.headerRow}>
+      <Animated.View
+        entering={FadeInDown.duration(320).delay(20)}
+        style={styles.headerRow}>
         <ColorfulIcon
           library="ionicons"
           name="options"
@@ -157,9 +319,10 @@ export function SettingsView({
         </View>
 
         <Pressable
-          style={[
+          style={({ pressed }) => [
             styles.statusBtn,
             { backgroundColor: colors.primaryTint, borderColor: colors.primaryBorder },
+            pressed && { transform: [{ scale: 0.95 }], opacity: 0.85 },
           ]}
           onPress={onOpenSystemStatus}>
           <Ionicons name="pulse" size={14} color={colors.primary} style={{ marginRight: 4 }} />
@@ -167,10 +330,11 @@ export function SettingsView({
             System Status ›
           </ThemedText>
         </Pressable>
-      </View>
+      </Animated.View>
 
       {/* 1. Theme & Appearance Switcher Card with Colorful Badges */}
-      <View
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(60)}
         style={[
           styles.sectionCard,
           { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -206,12 +370,13 @@ export function SettingsView({
         <View style={styles.themeOptionsRow}>
           {/* Light Theme Option */}
           <Pressable
-            style={[
+            style={({ pressed }) => [
               styles.themeOptionCard,
               {
                 backgroundColor: !isDark ? (isDark ? '#1C2E24' : '#F0FDF4') : colors.inputBg,
                 borderColor: !isDark ? colors.primary : colors.cardBorder,
               },
+              pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 },
             ]}
             onPress={() => setTheme('light')}>
             <View style={styles.themeOptionTop}>
@@ -244,12 +409,13 @@ export function SettingsView({
 
           {/* Dark Theme Option */}
           <Pressable
-            style={[
+            style={({ pressed }) => [
               styles.themeOptionCard,
               {
                 backgroundColor: isDark ? '#16281E' : colors.inputBg,
                 borderColor: isDark ? colors.primary : colors.cardBorder,
               },
+              pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 },
             ]}
             onPress={() => setTheme('dark')}>
             <View style={styles.themeOptionTop}>
@@ -280,10 +446,11 @@ export function SettingsView({
             </ThemedText>
           </Pressable>
         </View>
-      </View>
+      </Animated.View>
 
       {/* 2. Control Mode Card with Colorful Icons */}
-      <View
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(110)}
         style={[
           styles.sectionCard,
           { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -299,11 +466,12 @@ export function SettingsView({
             },
           ]}>
           <Pressable
-            style={[
+            style={({ pressed }) => [
               styles.modeSegment,
               !autoMode
                 ? [styles.modeSegmentActive, { backgroundColor: colors.primary }]
                 : { backgroundColor: 'transparent' },
+              pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 },
             ]}
             onPress={() => {
               if (autoMode) onToggleAutoMode();
@@ -336,11 +504,12 @@ export function SettingsView({
           </Pressable>
 
           <Pressable
-            style={[
+            style={({ pressed }) => [
               styles.modeSegment,
               autoMode
                 ? [styles.modeSegmentActive, { backgroundColor: colors.primary }]
                 : { backgroundColor: 'transparent' },
+              pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 },
             ]}
             onPress={() => {
               if (!autoMode) onToggleAutoMode();
@@ -372,10 +541,11 @@ export function SettingsView({
             </ThemedText>
           </Pressable>
         </View>
-      </View>
+      </Animated.View>
 
       {/* 3. Smart Control Settings Card with Colorful Icons */}
-      <View
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(160)}
         style={[
           styles.sectionCard,
           { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -406,7 +576,11 @@ export function SettingsView({
 
           <View style={[styles.stepperContainer, { backgroundColor: colors.inputBg }]}>
             <Pressable
-              style={[styles.stepperBtn, { backgroundColor: colors.card }]}
+              style={({ pressed }) => [
+                styles.stepperBtn,
+                { backgroundColor: colors.card },
+                pressed && { transform: [{ scale: 0.92 }] },
+              ]}
               onPress={handleDecTimeout}>
               <Ionicons name="remove" size={16} color={colors.primary} />
             </Pressable>
@@ -414,11 +588,51 @@ export function SettingsView({
               {timeoutMins} min
             </ThemedText>
             <Pressable
-              style={[styles.stepperBtn, { backgroundColor: colors.card }]}
+              style={({ pressed }) => [
+                styles.stepperBtn,
+                { backgroundColor: colors.card },
+                pressed && { transform: [{ scale: 0.92 }] },
+              ]}
               onPress={handleIncTimeout}>
               <Ionicons name="add" size={16} color={colors.primary} />
             </Pressable>
           </View>
+        </View>
+
+        {/* Individual Timeout Update Action */}
+        <View style={styles.singleActionRow}>
+          {timeoutStatus && (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              style={{ flex: 1 }}>
+              <ThemedText
+                style={[
+                  styles.inlineStatusText,
+                  { color: timeoutStatus.startsWith('✓') ? colors.success : colors.danger },
+                ]}>
+                {timeoutStatus}
+              </ThemedText>
+            </Animated.View>
+          )}
+          <Pressable
+            style={({ pressed }) => [
+              styles.singleUpdateBtn,
+              { backgroundColor: colors.primary },
+              pressed && { transform: [{ scale: 0.96 }], opacity: 0.85 },
+              isSavingTimeout && { opacity: 0.6 },
+            ]}
+            onPress={handleUpdateTimeout}
+            disabled={isSavingTimeout}>
+            {isSavingTimeout ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="checkmark-sharp" size={14} color="#FFFFFF" />
+            )}
+            <ThemedText style={styles.singleUpdateBtnText}>
+              {isSavingTimeout ? 'Saving...' : `Update Timeout (${timeoutMins} min)`}
+            </ThemedText>
+          </Pressable>
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.divider }]} />
@@ -438,19 +652,49 @@ export function SettingsView({
                 Distance Threshold
               </ThemedText>
               <ThemedText style={[styles.itemLabelSub, { color: colors.textSecondary }]}>
-                Proximity trigger limit
+                Proximity trigger limit (manual input)
               </ThemedText>
             </View>
           </View>
 
+          {/* Editable Manual Input & Stepper */}
           <View
             style={[
-              styles.distBadge,
-              { backgroundColor: colors.primaryTint, borderColor: colors.primaryBorder },
+              styles.distInputWrapper,
+              { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
             ]}>
-            <ThemedText style={[styles.distBadgeText, { color: colors.primary }]}>
-              {distanceThreshold} cm
-            </ThemedText>
+            <Pressable
+              style={[styles.stepperBtn, { backgroundColor: colors.card }]}
+              onPress={handleDecDist}>
+              <Ionicons name="remove" size={15} color={colors.primary} />
+            </Pressable>
+
+            <View style={styles.distInputInner}>
+              <TextInput
+                style={[styles.distTextInput, { color: colors.text }]}
+                value={distInputStr}
+                onChangeText={handleDistTextChange}
+                onBlur={handleDistBlur}
+                keyboardType="numeric"
+                maxLength={3}
+                placeholder="50"
+                placeholderTextColor={colors.textMuted}
+                selectTextOnFocus
+              />
+              <ThemedText style={[styles.distUnitLabel, { color: colors.primary }]}>
+                cm
+              </ThemedText>
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.stepperBtn,
+                { backgroundColor: colors.card },
+                pressed && { transform: [{ scale: 0.92 }] },
+              ]}
+              onPress={handleIncDist}>
+              <Ionicons name="add" size={15} color={colors.primary} />
+            </Pressable>
           </View>
         </View>
 
@@ -461,7 +705,7 @@ export function SettingsView({
               style={[
                 styles.sliderFill,
                 {
-                  width: `${(distanceThreshold / 200) * 100}%`,
+                  width: `${Math.min(100, Math.max(0, (distanceThreshold / 200) * 100))}%`,
                   backgroundColor: colors.primary,
                 },
               ]}
@@ -472,18 +716,22 @@ export function SettingsView({
               10 cm
             </ThemedText>
             <View style={styles.presetButtonsRow}>
-              {[30, 50, 100, 150].map((d) => (
+              {[30, 50, 100, 150, 200].map((d) => (
                 <Pressable
                   key={d}
-                  style={[
+                  style={({ pressed }) => [
                     styles.presetChip,
                     { backgroundColor: colors.inputBg },
                     distanceThreshold === d && [
                       styles.presetChipActive,
                       { backgroundColor: colors.primary },
                     ],
+                    pressed && { transform: [{ scale: 0.93 }] },
                   ]}
-                  onPress={() => setDistanceThreshold(d)}>
+                  onPress={() => {
+                    setDistanceThreshold(d);
+                    setDistInputStr(String(d));
+                  }}>
                   <ThemedText
                     style={[
                       styles.presetChipText,
@@ -501,6 +749,42 @@ export function SettingsView({
           </View>
         </View>
 
+        {/* Individual Distance Update Action */}
+        <View style={styles.singleActionRow}>
+          {distStatus && (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              style={{ flex: 1 }}>
+              <ThemedText
+                style={[
+                  styles.inlineStatusText,
+                  { color: distStatus.startsWith('✓') ? colors.success : colors.danger },
+                ]}>
+                {distStatus}
+              </ThemedText>
+            </Animated.View>
+          )}
+          <Pressable
+            style={({ pressed }) => [
+              styles.singleUpdateBtn,
+              { backgroundColor: colors.primary },
+              pressed && { transform: [{ scale: 0.96 }], opacity: 0.85 },
+              isSavingDist && { opacity: 0.6 },
+            ]}
+            onPress={handleUpdateDistance}
+            disabled={isSavingDist}>
+            {isSavingDist ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="checkmark-sharp" size={14} color="#FFFFFF" />
+            )}
+            <ThemedText style={styles.singleUpdateBtnText}>
+              {isSavingDist ? 'Saving...' : `Update Distance (${distanceThreshold} cm)`}
+            </ThemedText>
+          </Pressable>
+        </View>
+
         <View style={[styles.divider, { backgroundColor: colors.divider }]} />
 
         {/* Which Lights to Control in Smart Control Mode */}
@@ -510,7 +794,12 @@ export function SettingsView({
           </ThemedText>
 
           {/* Checkbox Light 1 */}
-          <Pressable style={styles.checkboxRow} onPress={toggleControlLoad1}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.checkboxRow,
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={toggleControlLoad1}>
             <View
               style={[
                 styles.checkboxBox,
@@ -528,7 +817,12 @@ export function SettingsView({
           </Pressable>
 
           {/* Checkbox Light 2 */}
-          <Pressable style={styles.checkboxRow} onPress={toggleControlLoad2}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.checkboxRow,
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={toggleControlLoad2}>
             <View
               style={[
                 styles.checkboxBox,
@@ -544,11 +838,48 @@ export function SettingsView({
               Control Light 2 (5V DC Bulb)
             </ThemedText>
           </Pressable>
+
+          {/* Individual Target Lights Update Action */}
+          <View style={styles.singleActionRow}>
+            {targetStatus && (
+              <Animated.View
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(150)}
+                style={{ flex: 1 }}>
+                <ThemedText
+                  style={[
+                    styles.inlineStatusText,
+                    { color: targetStatus.startsWith('✓') ? colors.success : colors.danger },
+                  ]}>
+                  {targetStatus}
+                </ThemedText>
+              </Animated.View>
+            )}
+            <Pressable
+              style={({ pressed }) => [
+                styles.singleUpdateBtn,
+                { backgroundColor: colors.primary },
+                pressed && { transform: [{ scale: 0.96 }], opacity: 0.85 },
+                isSavingTarget && { opacity: 0.6 },
+              ]}
+              onPress={handleUpdateTarget}
+              disabled={isSavingTarget}>
+              {isSavingTarget ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="checkmark-sharp" size={14} color="#FFFFFF" />
+              )}
+              <ThemedText style={styles.singleUpdateBtnText}>
+                {isSavingTarget ? 'Saving...' : 'Update Target Lights'}
+              </ThemedText>
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </Animated.View>
 
       {/* 4. ESP32 Hardware & Tariff Configuration */}
-      <View
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(210)}
         style={[
           styles.sectionCard,
           { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -570,66 +901,117 @@ export function SettingsView({
           <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>
             ESP32 IP Address
           </ThemedText>
-          <TextInput
-            style={[
-              styles.textInput,
-              {
-                backgroundColor: colors.inputBg,
-                borderColor: colors.inputBorder,
-                color: colors.text,
-              },
-            ]}
-            value={tempIp}
-            onChangeText={setTempIp}
-            placeholder="192.168.1.100"
-            placeholderTextColor={colors.textMuted}
-            onSubmitEditing={() => onIpChange(tempIp)}
-          />
+          <View style={styles.inputWithActionRow}>
+            <TextInput
+              style={[
+                styles.textInput,
+                styles.inputFlex,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.inputBorder,
+                  color: colors.text,
+                },
+              ]}
+              value={tempIp}
+              onChangeText={setTempIp}
+              placeholder="192.168.1.100"
+              placeholderTextColor={colors.textMuted}
+              onSubmitEditing={handleUpdateIp}
+            />
+            <Pressable
+              style={({ pressed }) => [
+                styles.singleUpdateBtn,
+                { backgroundColor: colors.primary, height: 42, paddingHorizontal: 14 },
+                pressed && { transform: [{ scale: 0.96 }], opacity: 0.85 },
+                isSavingIp && { opacity: 0.6 },
+              ]}
+              onPress={handleUpdateIp}
+              disabled={isSavingIp}>
+              <Ionicons name="link-outline" size={15} color="#FFFFFF" />
+              <ThemedText style={styles.singleUpdateBtnText}>Update IP</ThemedText>
+            </Pressable>
+          </View>
+          {ipStatus && (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              style={{ flex: 1 }}>
+              <ThemedText
+                style={[
+                  styles.inlineStatusText,
+                  { color: ipStatus.startsWith('✓') ? colors.success : colors.danger },
+                ]}>
+                {ipStatus}
+              </ThemedText>
+            </Animated.View>
+          )}
         </View>
 
         <View style={styles.inputGroup}>
-          <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>
-            Tariff Rate (₹ per kWh)
-          </ThemedText>
-          <TextInput
-            style={[
-              styles.textInput,
-              {
-                backgroundColor: colors.inputBg,
-                borderColor: colors.inputBorder,
-                color: colors.text,
-              },
-            ]}
-            value={tempTariff}
-            onChangeText={setTempTariff}
-            keyboardType="numeric"
-            placeholder="8.0"
-            placeholderTextColor={colors.textMuted}
-          />
-        </View>
-
-        {saveStatus && (
-          <ThemedText
-            style={[
-              styles.saveStatusText,
-              { color: saveStatus.startsWith('✓') ? colors.success : colors.danger },
-            ]}>
-            {saveStatus}
-          </ThemedText>
-        )}
-
-        <Pressable
-          style={[styles.saveBtn, { backgroundColor: colors.primary }]}
-          onPress={handleSaveAll}>
-          <View style={styles.btnContentRow}>
-            <Ionicons name="checkmark-circle" size={17} color="#FFFFFF" />
-            <ThemedText style={styles.saveBtnText}>Save All Settings to ESP32</ThemedText>
+          <View>
+            <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>
+              Tariff Rate (₹ per kWh)
+            </ThemedText>
+            <ThemedText style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>
+              Electricity board cost per unit (1 unit = 1 kWh) to calculate your power bill
+            </ThemedText>
           </View>
-        </Pressable>
-      </View>
+          <View style={styles.inputWithActionRow}>
+            <TextInput
+              style={[
+                styles.textInput,
+                styles.inputFlex,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.inputBorder,
+                  color: colors.text,
+                },
+              ]}
+              value={tempTariff}
+              onChangeText={setTempTariff}
+              keyboardType="numeric"
+              placeholder="8.0"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Pressable
+              style={({ pressed }) => [
+                styles.singleUpdateBtn,
+                { backgroundColor: colors.primary, height: 42, paddingHorizontal: 14 },
+                pressed && { transform: [{ scale: 0.96 }], opacity: 0.85 },
+                isSavingTariff && { opacity: 0.6 },
+              ]}
+              onPress={handleUpdateTariff}
+              disabled={isSavingTariff}>
+              {isSavingTariff ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="cash-outline" size={15} color="#FFFFFF" />
+              )}
+              <ThemedText style={styles.singleUpdateBtnText}>
+                {isSavingTariff ? 'Saving...' : 'Update Tariff'}
+              </ThemedText>
+            </Pressable>
+          </View>
+          {tariffStatus && (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              style={{ flex: 1 }}>
+              <ThemedText
+                style={[
+                  styles.inlineStatusText,
+                  { color: tariffStatus.startsWith('✓') ? colors.success : colors.danger },
+                ]}>
+                {tariffStatus}
+              </ThemedText>
+            </Animated.View>
+          )}
+        </View>
+      </Animated.View>
 
       {/* 5. Reset Energy Counter */}
-      <View
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(260)}
         style={[
           styles.sectionCard,
           {
@@ -653,10 +1035,15 @@ export function SettingsView({
           Zero out accumulated kilowatt-hours (kWh) and cost for a new test cycle.
         </ThemedText>
 
-        <Pressable style={styles.resetBtn} onPress={handleResetConfirm}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.resetBtn,
+            pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 },
+          ]}
+          onPress={handleResetConfirm}>
           <ThemedText style={styles.resetBtnText}>Reset Energy to 0.000 kWh</ThemedText>
         </Pressable>
-      </View>
+      </Animated.View>
     </ScrollView>
   );
 }
@@ -846,6 +1233,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  distInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 3,
+    gap: 3,
+  },
+  distInputInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    minWidth: 54,
+  },
+  distTextInput: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    minWidth: 28,
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+  },
+  distUnitLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 2,
+  },
   sliderTrackWrapper: {
     gap: 8,
   },
@@ -965,5 +1380,83 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontWeight: '700',
     fontSize: 12,
+  },
+  cardActionRow: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.06)',
+    gap: 8,
+  },
+  singleActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  singleUpdateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  singleUpdateBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  inlineStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+  },
+  inputWithActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  inputFlex: {
+    flex: 1,
+  },
+  individualUpdateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  individualUpdateBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  smartStatusBadge: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smartStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

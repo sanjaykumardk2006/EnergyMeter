@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -84,14 +85,20 @@ export function PowerConsumptionChart({ currentPowerWatts }: Props) {
                   key={idx}
                   style={styles.colTouchArea}
                   onPress={() => setSelectedPoint(idx)}>
-                  <View
+                  <Animated.View
+                    entering={FadeInUp.duration(360).delay(idx * 35)}
                     style={[
                       styles.barFill,
                       {
                         height: `${heightPercent}%`,
-                        backgroundColor: isDark
-                          ? 'rgba(16, 185, 129, 0.28)'
-                          : 'rgba(5, 150, 105, 0.2)',
+                        backgroundColor: isSelected
+                          ? isDark
+                            ? 'rgba(16, 185, 129, 0.45)'
+                            : 'rgba(5, 150, 105, 0.35)'
+                          : isDark
+                          ? 'rgba(16, 185, 129, 0.22)'
+                          : 'rgba(5, 150, 105, 0.16)',
+                        transform: [{ scale: isSelected ? 1.08 : 1 }],
                       },
                     ]}>
                     <View
@@ -104,7 +111,7 @@ export function PowerConsumptionChart({ currentPowerWatts }: Props) {
                         ],
                       ]}
                     />
-                  </View>
+                  </Animated.View>
                 </Pressable>
               );
             })}

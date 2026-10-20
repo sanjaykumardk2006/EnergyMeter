@@ -78,6 +78,8 @@ export class EnergyMeterService {
       if (config.grid_voltage !== undefined) params.append('voltage', String(config.grid_voltage));
       if (config.tariff_rate !== undefined) params.append('tariff', String(config.tariff_rate));
       if (config.auto_off_delay_sec !== undefined) params.append('delay', String(config.auto_off_delay_sec));
+      if (config.dist_threshold_cm !== undefined) params.append('dist_threshold', String(config.dist_threshold_cm));
+      if (config.occupancy_dist_threshold_cm !== undefined) params.append('dist_threshold', String(config.occupancy_dist_threshold_cm));
       if (config.acs_sens !== undefined) params.append('acs_sens', String(config.acs_sens));
       if (config.calib_i !== undefined) params.append('calib_i', String(config.calib_i));
 

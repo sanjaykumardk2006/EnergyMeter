@@ -15,6 +15,7 @@ export interface EnergyMeterStatus {
   ir_detected: boolean;
   distance_cm: number;
   distance_valid: boolean;
+  occupancy_dist_threshold_cm?: number;
   voltage: number;
   current_amps: number;
   power_watts: number;
@@ -33,6 +34,8 @@ export interface EnergyMeterConfig {
   auto_mode?: boolean;
   auto_target?: 1 | 2 | 3;
   auto_off_delay_sec?: number;
+  dist_threshold_cm?: number;
+  occupancy_dist_threshold_cm?: number;
   grid_voltage?: number;
   tariff_rate?: number;
   acs_sens?: number;
