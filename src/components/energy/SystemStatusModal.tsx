@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   TextInput,
   View,
@@ -85,6 +87,8 @@ export function SystemStatusModal({
     },
   ];
 
+  const topModalPadding = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) + 6 : 0;
+
   return (
     <Modal
       visible={visible}
@@ -96,7 +100,11 @@ export function SystemStatusModal({
         <View
           style={[
             styles.headerBar,
-            { backgroundColor: colors.card, borderBottomColor: colors.cardBorder },
+            {
+              backgroundColor: colors.card,
+              borderBottomColor: colors.cardBorder,
+              paddingTop: 12 + topModalPadding,
+            },
           ]}>
           <Pressable style={styles.backBtn} onPress={onClose}>
             <Ionicons name="arrow-back" size={22} color={colors.text} />

@@ -1,8 +1,10 @@
 import React from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Switch,
   View,
@@ -41,6 +43,7 @@ export function LoadDetailModal({
   const loadAmps = isOn ? (currentAmps > 0 ? currentAmps / 2 : 0.42) : 0.0;
   const loadWatts = loadAmps * voltage;
   const loadKwhToday = (loadWatts * 2.5) / 1000;
+  const topModalPadding = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) + 6 : 0;
 
   return (
     <Modal
@@ -53,7 +56,11 @@ export function LoadDetailModal({
         <View
           style={[
             styles.headerBar,
-            { backgroundColor: colors.card, borderBottomColor: colors.cardBorder },
+            {
+              backgroundColor: colors.card,
+              borderBottomColor: colors.cardBorder,
+              paddingTop: 12 + topModalPadding,
+            },
           ]}>
           <Pressable style={styles.backBtn} onPress={onClose}>
             <Ionicons name="arrow-back" size={22} color={colors.text} />

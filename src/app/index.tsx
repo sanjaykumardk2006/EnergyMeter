@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
+import { Platform, StatusBar, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNavBar, TabKey } from '@/components/energy/BottomNavBar';
 import { EnergyView } from '@/components/energy/EnergyView';
@@ -12,6 +13,7 @@ import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { useEnergyMeter } from '@/hooks/useEnergyMeter';
 
 function MainAppContent() {
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [loadDetailModal, setLoadDetailModal] = useState<{ visible: boolean; loadId: 1 | 2 }>({
@@ -19,6 +21,9 @@ function MainAppContent() {
     loadId: 1,
   });
   const [systemStatusVisible, setSystemStatusVisible] = useState<boolean>(false);
+
+  // Top spacing to ensure content clears status bar/notch and sits comfortably lower
+  const topPadding = (Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : insets.top) + 16;
 
   const {
     status,
@@ -60,9 +65,17 @@ function MainAppContent() {
   const lastActionReason = status?.last_action_reason;
 
   return (
-    <SafeAreaView style={[styles.safeRoot, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <View style={[styles.contentContainer, { backgroundColor: colors.background }]}>
+    <View style={[styles.safeRoot, { backgroundColor: colors.background }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.background}
+        translucent={Platform.OS === 'android'}
+      />
+      <View
+        style={[
+          styles.contentContainer,
+          { backgroundColor: colors.background, paddingTop: topPadding },
+        ]}>
         {/* Tab 1: Home Dashboard (Screen 1: Manual Control & Screen 2: Smart Control) */}
         {activeTab === 'home' && (
           <HomeDashboardView
@@ -163,7 +176,7 @@ function MainAppContent() {
         onRefresh={refresh}
         onClose={() => setSystemStatusVisible(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
