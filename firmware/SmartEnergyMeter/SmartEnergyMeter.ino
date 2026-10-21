@@ -426,10 +426,17 @@ void handlePostAutoMode() {
 // -----------------------------------------------------------------------------
 void handlePostConfig() {
   sendCORS();
+  if (server.hasArg("auto_mode")) {
+    String a = server.arg("auto_mode");
+    auto_mode = (a == "1" || a == "true" || a == "on");
+  }
   if (server.hasArg("voltage")) grid_voltage = server.arg("voltage").toFloat();
   if (server.hasArg("tariff")) tariff_rate = server.arg("tariff").toFloat();
   if (server.hasArg("delay")) auto_off_delay_sec = server.arg("delay").toInt();
-  if (server.hasArg("target")) auto_target = server.arg("target").toInt();
+  if (server.hasArg("target")) {
+    int t = server.arg("target").toInt();
+    if (t >= 1 && t <= 3) auto_target = t;
+  }
   if (server.hasArg("dist_threshold")) occupancy_dist_threshold_cm = server.arg("dist_threshold").toFloat();
   if (server.hasArg("calib_i")) acs_calib_factor = server.arg("calib_i").toFloat();
   if (server.hasArg("calib_v")) voltage_calib_factor = server.arg("calib_v").toFloat();
@@ -439,10 +446,16 @@ void handlePostConfig() {
   if (server.hasArg("plain")) {
     String b = server.arg("plain");
     int i;
+    if ((i = b.indexOf("\"auto_mode\":")) != -1) {
+      auto_mode = (b.substring(i + 12).startsWith("true") || b.substring(i + 12).startsWith("1"));
+    }
     if ((i = b.indexOf("\"voltage\":")) != -1) grid_voltage = b.substring(i + 10).toFloat();
     if ((i = b.indexOf("\"tariff\":")) != -1) tariff_rate = b.substring(i + 9).toFloat();
     if ((i = b.indexOf("\"delay\":")) != -1) auto_off_delay_sec = b.substring(i + 8).toInt();
-    if ((i = b.indexOf("\"target\":")) != -1) auto_target = b.substring(i + 9).toInt();
+    if ((i = b.indexOf("\"target\":")) != -1) {
+      int t = b.substring(i + 9).toInt();
+      if (t >= 1 && t <= 3) auto_target = t;
+    }
     if ((i = b.indexOf("\"dist_threshold\":")) != -1) occupancy_dist_threshold_cm = b.substring(i + 17).toFloat();
     if ((i = b.indexOf("\"occupancy_dist_threshold_cm\":")) != -1) occupancy_dist_threshold_cm = b.substring(i + 30).toFloat();
     if ((i = b.indexOf("\"calib_i\":")) != -1) acs_calib_factor = b.substring(i + 10).toFloat();
@@ -531,12 +544,13 @@ void setup() {
   pinMode(PIN_PIR_OUT, INPUT);
   pinMode(PIN_US_TRIG, OUTPUT);
   pinMode(PIN_US_ECHO, INPUT);
-  pinMode(PIN_RELAY_1, OUTPUT);
-  pinMode(PIN_RELAY_2, OUTPUT);
 
   // 2. CRITICAL SAFE BOOT STATE: Initialize Relays to OFF (Active-LOW: HIGH)
+  // Preset output level to HIGH BEFORE declaring pinMode(OUTPUT) to prevent coil click
   digitalWrite(PIN_RELAY_1, RELAY_STATE_OFF);
   digitalWrite(PIN_RELAY_2, RELAY_STATE_OFF);
+  pinMode(PIN_RELAY_1, OUTPUT);
+  pinMode(PIN_RELAY_2, OUTPUT);
   relay1_on = false;
   relay2_on = false;
 
@@ -571,6 +585,7 @@ void setup() {
 
   // 6. Setup mDNS responder (http://energymeter.local)
   if (MDNS.begin("energymeter")) {
+    MDNS.addService("http", "tcp", 80);
     Serial.println("mDNS responder started at http://energymeter.local");
   }
 
@@ -624,6 +639,11 @@ void loop() {
     bool ultrasonic_near = distance_valid && (distance_cm >= 3.0f && distance_cm <= occupancy_dist_threshold_cm);
     occupancy_detected = pir_motion || ir_detected || ultrasonic_near;
 
+    // Track activity timestamp continuously so idle duration is accurate in all modes
+    if (occupancy_detected) {
+      last_motion_timestamp = now;
+    }
+
     // -------------------------------------------------------------------------
     // AUTOMATIC MODE LOAD CONTROL
     // Sensor automation runs ONLY if auto_mode is true.
@@ -631,7 +651,6 @@ void loop() {
     // -------------------------------------------------------------------------
     if (auto_mode) {
       if (occupancy_detected) {
-        last_motion_timestamp = now;
 
         // Anti-chatter protection: Ensure minimum time elapsed since last relay switch
         if (now - last_relay_switch_ms >= MIN_SWITCH_INTERVAL_MS) {
@@ -703,9 +722,15 @@ void loop() {
     }
 
     if (hardware_current_active) {
-      current_amps = measured_current;
-      // Real DC Power (W) = Live Voltage (V) * Live Current (A)
-      current_power_watts = current_amps * grid_voltage;
+      // If both relays are OFF, ignore idle ADC noise (< 0.15A) to prevent phantom energy accumulation
+      if (!relay1_on && !relay2_on && measured_current < 0.15f) {
+        current_amps = 0.0f;
+        current_power_watts = 0.0f;
+      } else {
+        current_amps = measured_current;
+        // Real DC Power (W) = Live Voltage (V) * Live Current (A)
+        current_power_watts = current_amps * grid_voltage;
+      }
     } else {
       current_amps = 0.0f;
       current_power_watts = 0.0f;
