@@ -46,7 +46,9 @@ function MainAppContent() {
     simulateSensorTrigger,
   } = useEnergyMeter();
 
-  const voltage = status?.voltage ?? 5.0; // 5V DC Nominal
+  const voltage = status?.voltage ?? 0.0;
+  const measuredVoltage = status?.measured_voltage ?? voltage;
+  const hardwareVoltageActive = status?.hardware_voltage_active ?? false;
   const currentAmps = status?.current_amps ?? 0;
   const powerWatts = status?.power_watts ?? 0;
   const totalKwh = status?.total_kwh ?? 0;
@@ -93,6 +95,8 @@ function MainAppContent() {
               relay1={relay1}
               relay2={relay2}
               voltage={voltage}
+              measuredVoltage={measuredVoltage}
+              hardwareVoltageActive={hardwareVoltageActive}
               currentAmps={currentAmps}
               powerWatts={powerWatts}
               totalKwh={totalKwh}
@@ -134,6 +138,9 @@ function MainAppContent() {
               distanceCm={distanceCm}
               distanceValid={distanceValid}
               currentAmps={currentAmps}
+              voltage={voltage}
+              measuredVoltage={measuredVoltage}
+              hardwareVoltageActive={hardwareVoltageActive}
               autoMode={autoMode}
               relay1={relay1}
               relay2={relay2}
@@ -151,6 +158,7 @@ function MainAppContent() {
             style={styles.tabAnimatedWrapper}>
             <EnergyView
               voltage={voltage}
+              hardwareVoltageActive={hardwareVoltageActive}
               currentAmps={currentAmps}
               powerWatts={powerWatts}
               totalKwh={totalKwh}

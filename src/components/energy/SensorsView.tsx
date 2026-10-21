@@ -10,6 +10,9 @@ interface Props {
   distanceCm: number;
   distanceValid: boolean;
   currentAmps: number;
+  voltage?: number;
+  measuredVoltage?: number;
+  hardwareVoltageActive?: boolean;
   autoMode?: boolean;
   relay1?: boolean;
   relay2?: boolean;
@@ -22,6 +25,9 @@ export function SensorsView({
   distanceCm,
   distanceValid,
   currentAmps,
+  voltage = 0.0,
+  measuredVoltage,
+  hardwareVoltageActive,
   autoMode = false,
   relay1 = false,
   relay2 = false,
@@ -31,6 +37,9 @@ export function SensorsView({
   const isNearby = distanceValid && distanceCm > 0 && distanceCm < 120;
   const distPercent = distanceValid ? Math.min(100, Math.max(4, (distanceCm / 200) * 100)) : 0;
   const isOccupied = pirMotion || irDetected || isNearby;
+  const liveVoltage = measuredVoltage ?? voltage;
+  const isVoltageLive = hardwareVoltageActive ?? (liveVoltage > 0.4);
+  const voltPercent = isVoltageLive ? Math.min(100, Math.max(4, (liveVoltage / 6.0) * 100)) : 0;
 
   return (
     <ScrollView
@@ -422,6 +431,93 @@ export function SensorsView({
           <View style={[styles.cardFooter, { borderTopColor: colors.divider }]}>
             <ThemedText style={[styles.footerValText, { color: colors.textSecondary }]}>
               ADC1 CH6: {currentAmps > 0.05 ? 'Load Drawing Current' : 'Zero/Quiescent Load'}
+            </ThemedText>
+            <ThemedText style={[styles.footerTimeText, { color: colors.textMuted }]}>
+              Live Telemetry
+            </ThemedText>
+          </View>
+        </Animated.View>
+
+        {/* 5. DC Voltage Sensor Module (GPIO 35) Card */}
+        <Animated.View
+          entering={FadeInDown.duration(340).delay(250)}
+          style={[
+            styles.sensorCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}>
+          <View style={styles.cardTopRow}>
+            <View style={styles.cardLeft}>
+              <ColorfulIcon
+                library="ionicons"
+                name="flash"
+                variant="amber"
+                size={22}
+                containerSize={44}
+              />
+              <View style={{ flex: 1, paddingRight: 6 }}>
+                <ThemedText style={[styles.sensorName, { color: colors.text }]}>
+                  DC Voltage Sensor
+                </ThemedText>
+                <ThemedText style={[styles.sensorDesc, { color: colors.textSecondary }]}>
+                  Supply Rail (Loads 1 & 2 • GPIO 35)
+                </ThemedText>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor: isDark
+                    ? isVoltageLive ? 'rgba(245, 158, 11, 0.15)' : 'rgba(100, 116, 139, 0.15)'
+                    : isVoltageLive ? '#FEF3C7' : '#F1F5F9',
+                  borderWidth: 1,
+                  borderColor: isDark
+                    ? isVoltageLive ? 'rgba(245, 158, 11, 0.3)' : 'rgba(100, 116, 139, 0.25)'
+                    : isVoltageLive ? '#FDE68A' : '#E2E8F0',
+                },
+              ]}>
+              <ThemedText
+                style={[
+                  styles.statusBadgeText,
+                  { color: isVoltageLive ? '#D97706' : colors.textMuted },
+                ]}>
+                {isVoltageLive ? `${liveVoltage.toFixed(2)} V` : '0.00 V (Off)'}
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* Voltage Rail Gauge Bar */}
+          <View style={styles.gaugeContainer}>
+            <View style={[styles.gaugeTrack, { backgroundColor: isDark ? colors.inputBg : '#E2E8F0' }]}>
+              <View
+                style={[
+                  styles.gaugeFill,
+                  {
+                    width: `${voltPercent}%`,
+                    backgroundColor: !isVoltageLive
+                      ? colors.textMuted
+                      : liveVoltage >= 4.75 && liveVoltage <= 5.25
+                      ? '#10B981'
+                      : liveVoltage > 5.25
+                      ? '#EF4444'
+                      : '#F59E0B',
+                  },
+                ]}
+              />
+            </View>
+            <View style={styles.gaugeLabels}>
+              <ThemedText style={[styles.gaugeSub, { color: colors.textMuted }]}>0.0V (Off)</ThemedText>
+              <ThemedText style={[styles.gaugeSub, { color: colors.textMuted }]}>
+                {isVoltageLive ? '5.0V Nominal Rail' : 'Standby'}
+              </ThemedText>
+              <ThemedText style={[styles.gaugeSub, { color: colors.textMuted }]}>6.0V Max</ThemedText>
+            </View>
+          </View>
+
+          <View style={[styles.cardFooter, { borderTopColor: colors.divider }]}>
+            <ThemedText style={[styles.footerValText, { color: colors.textSecondary }]}>
+              ADC1 CH7: {isVoltageLive ? `5:1 Divider Active • P = ${(liveVoltage * currentAmps).toFixed(2)} W` : 'No Voltage Detected'}
             </ThemedText>
             <ThemedText style={[styles.footerTimeText, { color: colors.textMuted }]}>
               Live Telemetry

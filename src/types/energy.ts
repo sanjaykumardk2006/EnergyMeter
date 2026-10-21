@@ -17,6 +17,8 @@ export interface EnergyMeterStatus {
   distance_valid: boolean;
   occupancy_dist_threshold_cm?: number;
   voltage: number;
+  measured_voltage?: number;
+  hardware_voltage_active?: boolean;
   current_amps: number;
   power_watts: number;
   total_wh: number;
@@ -28,6 +30,7 @@ export interface EnergyMeterStatus {
   hardware_current_active?: boolean;
   acs_sensitivity?: number;
   calib_i?: number;
+  calib_v?: number;
 }
 
 export interface EnergyMeterConfig {
@@ -40,4 +43,5 @@ export interface EnergyMeterConfig {
   tariff_rate?: number;
   acs_sens?: number;
   calib_i?: number;
+  calib_v?: number;
 }

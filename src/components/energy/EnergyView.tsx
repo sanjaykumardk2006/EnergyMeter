@@ -8,6 +8,7 @@ import { PowerConsumptionChart } from './PowerConsumptionChart';
 
 interface Props {
   voltage: number;
+  hardwareVoltageActive?: boolean;
   currentAmps: number;
   powerWatts: number;
   totalKwh: number;
@@ -17,6 +18,7 @@ interface Props {
 
 export function EnergyView({
   voltage,
+  hardwareVoltageActive = false,
   currentAmps,
   powerWatts,
   totalKwh,
@@ -82,8 +84,8 @@ export function EnergyView({
           <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
             {voltage.toFixed(2)} V
           </ThemedText>
-          <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
-            DC Supply
+          <ThemedText style={[styles.metricSub, { color: hardwareVoltageActive ? '#D97706' : colors.textMuted }]}>
+            {hardwareVoltageActive ? 'GPIO 35 • Live Rail' : 'No Voltage (Standby)'}
           </ThemedText>
         </Animated.View>
 

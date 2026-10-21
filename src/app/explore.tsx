@@ -29,7 +29,7 @@ export default function ExploreScreen() {
     resetEnergy,
   } = useEnergyMeter();
 
-  const [voltage, setVoltage] = useState(String(status?.voltage ?? 5.0));
+  const [voltage, setVoltage] = useState(String(status?.voltage ?? 0.0));
   const [tariff, setTariff] = useState(String(status?.tariff_rate ?? 8));
   const [delaySec, setDelaySec] = useState(String(status?.auto_off_delay_sec ?? 300));
   const [calibI, setCalibI] = useState(String(status?.calib_i ?? 1.0));
@@ -175,9 +175,9 @@ export default function ExploreScreen() {
             </View>
 
             <View style={styles.pinRow}>
-              <ThemedText type="smallBold">6. Common DC Voltage:</ThemedText>
+              <ThemedText type="smallBold">6. Voltage Sensor Module (0-25V Divider):</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                Common 5.0V DC bus feeding Load 1 and Load 2 (Optional voltage divider to <ThemedText type="code">GPIO 35</ThemedText>)
+                S → <ThemedText type="code">GPIO 35</ThemedText> (ADC1 CH7 - WiFi Safe) | + → 3.3V | - → GND | Screw Terminal VCC & GND to 5V DC Supply (+ / -) to measure live voltage of both loads!
               </ThemedText>
             </View>
 

@@ -167,6 +167,8 @@ interface Props {
   relay1: boolean;
   relay2: boolean;
   voltage: number;
+  measuredVoltage?: number;
+  hardwareVoltageActive?: boolean;
   currentAmps: number;
   powerWatts: number;
   totalKwh: number;
@@ -199,6 +201,8 @@ export function HomeDashboardView({
   relay1,
   relay2,
   voltage,
+  measuredVoltage: _measuredVoltage,
+  hardwareVoltageActive = false,
   currentAmps,
   powerWatts,
   totalKwh,
@@ -744,8 +748,8 @@ export function HomeDashboardView({
             <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
               {voltage.toFixed(2)} V
             </ThemedText>
-            <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
-              DC Supply
+            <ThemedText style={[styles.metricSub, { color: hardwareVoltageActive ? '#D97706' : colors.textMuted }]}>
+              {hardwareVoltageActive ? 'GPIO 35 • Live Rail' : 'No Voltage (Standby)'}
             </ThemedText>
           </Animated.View>
 

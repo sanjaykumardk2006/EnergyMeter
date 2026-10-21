@@ -82,6 +82,7 @@ export class EnergyMeterService {
       if (config.occupancy_dist_threshold_cm !== undefined) params.append('dist_threshold', String(config.occupancy_dist_threshold_cm));
       if (config.acs_sens !== undefined) params.append('acs_sens', String(config.acs_sens));
       if (config.calib_i !== undefined) params.append('calib_i', String(config.calib_i));
+      if (config.calib_v !== undefined) params.append('calib_v', String(config.calib_v));
 
       const url = this.formatUrl(ip, `/api/config?${params.toString()}`);
       const res = await fetchWithTimeout(url, { method: 'POST' }, 3000);

@@ -11,7 +11,10 @@
   - Relay 1 (Load 1)    -> GPIO 25 (Digital OUT: Active-LOW, 5V DC bulb)
   - Relay 2 (Load 2)    -> GPIO 33 (Digital OUT: Active-LOW, 5V DC bulb)
   - ACS712 Current OUT  -> GPIO 34 (Analog IN: ADC1 CH6 - WiFi Safe on ESP32)
-  - Common DC Voltage   -> Nominal 5.0V DC bus feeding both 5V DC loads
+  - Voltage Sensor OUT  -> GPIO 35 (Analog IN: ADC1 CH7 - WiFi Safe on ESP32)
+    * Sensor Pin 'S' -> GPIO 35, '+' -> 3.3V, '-' -> GND
+    * Screw Terminals -> VCC to 5V DC Supply (+), GND to 5V DC Supply (-)
+  - Common DC Voltage   -> Measured live from 5V DC bus feeding both loads
 
   IMPORTANT SAFETY CONSTRAINTS:
   - Pure 5V DC prototype. DO NOT connect 230V AC mains to this prototype.
@@ -42,7 +45,10 @@
 #define PIN_RELAY_2   33  // Relay 2 (5V DC Bulb 2)
 
 // Hardware Current Sensor (ADC1 CH6 - WiFi safe on ESP32)
-#define PIN_ACS712    34  // ACS712 Current Sensor Analog OUT
+#define PIN_ACS712        34  // ACS712 Current Sensor Analog OUT
+
+// Hardware Voltage Sensor Module (ADC1 CH7 - WiFi safe on ESP32)
+#define PIN_VOLTAGE_SENSOR 35  // 0-25V Resistive Voltage Divider OUT (Pin S)
 
 // Most 5V relay modules are ACTIVE-LOW (LOW = ON, HIGH = OFF)
 const bool RELAY_ACTIVE_LOW = true;
@@ -66,9 +72,12 @@ float acs_zero_voltage = 2.50;        // Quiescent midpoint voltage at 0 Amps
 // Live Hardware Telemetry
 float measured_current = 0.0;         // Live DC Current (A) from ACS712
 bool hardware_current_active = false; // True when load > 0.05A detected through ACS712
+float measured_voltage = 0.0;         // Live DC Supply Voltage (V) from Voltage Sensor (GPIO 35)
+bool hardware_voltage_active = false; // True when supply voltage > 0.4V detected on rail
+float voltage_calib_factor = 1.0;     // Voltage multiplier calibration factor
 
 // 5V DC Prototype Electrical Ratings
-float grid_voltage = 5.0;             // Common DC Supply Voltage (5.0V DC)
+float grid_voltage = 0.0;             // Common DC Supply Voltage (0.0V default until sensor reads)
 float tariff_rate = 8.0;              // Cost per kWh (₹ / $ / €)
 
 // Sensor Telemetry
@@ -102,6 +111,38 @@ String last_action_reason = "System Initialized"; // Audit trail for relay actio
 unsigned long last_sensor_read_ms = 0;
 unsigned long last_energy_calc_ms = 0;
 unsigned long last_flash_save_ms = 0;
+
+// -----------------------------------------------------------------------------
+// HELPER: Measure DC Voltage from Voltage Sensor Module (GPIO 35)
+// -----------------------------------------------------------------------------
+void readHardwareVoltageSensor() {
+  const int NUM_SAMPLES = 80;
+  long sum_raw = 0;
+
+  // Average over multiple samples to suppress ADC noise
+  for (int j = 0; j < NUM_SAMPLES; j++) {
+    sum_raw += analogRead(PIN_VOLTAGE_SENSOR);
+    delayMicroseconds(150);
+  }
+
+  float avg_raw = (float)sum_raw / (float)NUM_SAMPLES;
+  // Convert ESP32 ADC (0-4095) to Pin Voltage (3.3V reference with 11dB attenuation)
+  float v_pin = (avg_raw / 4095.0f) * 3.3f;
+
+  // The voltage divider uses R1 = 30kΩ, R2 = 7.5kΩ -> ratio = (30k+7.5k)/7.5k = 5.0
+  float v_in = v_pin * 5.0f * voltage_calib_factor;
+
+  // Noise gate: if power supply is disconnected or turned off (< 0.40V)
+  if (v_in < 0.40f) {
+    measured_voltage = 0.0f;
+    hardware_voltage_active = false;
+    grid_voltage = 0.0f;
+  } else {
+    measured_voltage = v_in;
+    hardware_voltage_active = true;
+    grid_voltage = measured_voltage; // Dynamically update the live rail voltage
+  }
+}
 
 // -----------------------------------------------------------------------------
 // HELPER: Measure DC Current from ACS712 Hardware Sensor
@@ -211,6 +252,7 @@ void saveEnergyToFlash() {
   preferences.putInt("delay_sec", auto_off_delay_sec);
   preferences.putFloat("dist_thresh", occupancy_dist_threshold_cm);
   preferences.putFloat("calib_i", acs_calib_factor);
+  preferences.putFloat("calib_v", voltage_calib_factor);
   preferences.putFloat("acs_sens", acs_sensitivity);
   preferences.end();
 }
@@ -219,13 +261,14 @@ void loadEnergyFromFlash() {
   preferences.begin("energymeter", true);
   cumulative_wh = preferences.getDouble("wh", 0.0);
   cumulative_kwh = cumulative_wh / 1000.0;
-  grid_voltage = preferences.getFloat("voltage", 5.0);
+  grid_voltage = preferences.getFloat("voltage", 0.0);
   tariff_rate = preferences.getFloat("tariff", 8.0);
   auto_mode = preferences.getBool("auto_mode", false);
   auto_target = preferences.getInt("target", 3);
   auto_off_delay_sec = preferences.getInt("delay_sec", 300);
   occupancy_dist_threshold_cm = preferences.getFloat("dist_thresh", 120.0);
   acs_calib_factor = preferences.getFloat("calib_i", 1.0);
+  voltage_calib_factor = preferences.getFloat("calib_v", 1.0);
   acs_sensitivity = preferences.getFloat("acs_sens", 0.100);
   preferences.end();
 }
@@ -273,6 +316,8 @@ void handleGetStatus() {
   json += "\"distance_valid\":" + String(distance_valid ? "true" : "false") + ",";
   json += "\"occupancy_dist_threshold_cm\":" + String(occupancy_dist_threshold_cm, 1) + ",";
   json += "\"voltage\":" + String(grid_voltage, 2) + ",";
+  json += "\"measured_voltage\":" + String(measured_voltage, 2) + ",";
+  json += "\"hardware_voltage_active\":" + String(hardware_voltage_active ? "true" : "false") + ",";
   json += "\"current_amps\":" + String(current_amps, 3) + ",";
   json += "\"power_watts\":" + String(current_power_watts, 2) + ",";
   json += "\"total_wh\":" + String(cumulative_wh, 2) + ",";
@@ -283,7 +328,8 @@ void handleGetStatus() {
   json += "\"hardware_sensors\":true,";
   json += "\"hardware_current_active\":" + String(hardware_current_active ? "true" : "false") + ",";
   json += "\"acs_sensitivity\":" + String(acs_sensitivity, 3) + ",";
-  json += "\"calib_i\":" + String(acs_calib_factor, 2);
+  json += "\"calib_i\":" + String(acs_calib_factor, 2) + ",";
+  json += "\"calib_v\":" + String(voltage_calib_factor, 2);
   json += "}";
 
   server.send(200, "application/json", json);
@@ -386,6 +432,7 @@ void handlePostConfig() {
   if (server.hasArg("target")) auto_target = server.arg("target").toInt();
   if (server.hasArg("dist_threshold")) occupancy_dist_threshold_cm = server.arg("dist_threshold").toFloat();
   if (server.hasArg("calib_i")) acs_calib_factor = server.arg("calib_i").toFloat();
+  if (server.hasArg("calib_v")) voltage_calib_factor = server.arg("calib_v").toFloat();
   if (server.hasArg("acs_sens")) acs_sensitivity = server.arg("acs_sens").toFloat();
 
   // Support JSON payload
@@ -399,6 +446,7 @@ void handlePostConfig() {
     if ((i = b.indexOf("\"dist_threshold\":")) != -1) occupancy_dist_threshold_cm = b.substring(i + 17).toFloat();
     if ((i = b.indexOf("\"occupancy_dist_threshold_cm\":")) != -1) occupancy_dist_threshold_cm = b.substring(i + 30).toFloat();
     if ((i = b.indexOf("\"calib_i\":")) != -1) acs_calib_factor = b.substring(i + 10).toFloat();
+    if ((i = b.indexOf("\"calib_v\":")) != -1) voltage_calib_factor = b.substring(i + 10).toFloat();
     if ((i = b.indexOf("\"acs_sens\":")) != -1) acs_sensitivity = b.substring(i + 11).toFloat();
   }
 
@@ -438,12 +486,12 @@ void handleRootWeb() {
   html += ".telemetry{font-size:11px;color:#58a6ff;margin-bottom:12px;padding:6px 10px;background:rgba(88,166,255,0.1);border-radius:6px;}";
   html += "</style></head><body><div class='box'>";
   html += "<h1>⚡ Smart Energy Meter (5V DC)</h1>";
-  html += "<div class='telemetry'>Current Sensor: ACS712 (GPIO 34) " + String(hardware_current_active ? "🟢 COMBINED LOAD (" + String(current_amps, 2) + "A)" : "🟡 STANDBY") + " | Rail: " + String(grid_voltage, 1) + "V DC</div>";
+  html += "<div class='telemetry'>Voltage Sensor: GPIO 35 " + String(hardware_voltage_active ? "🟢 LIVE (" + String(measured_voltage, 2) + "V)" : "⚪ STANDBY") + " | Current Sensor: ACS712 (GPIO 34) " + String(hardware_current_active ? "🟢 COMBINED LOAD (" + String(current_amps, 2) + "A)" : "🟡 STANDBY") + " | Rail: " + String(grid_voltage, 2) + "V DC</div>";
 
   html += "<div class='grid'>";
   html += "<div class='card'><h3>DC Power</h3><div class='val'>" + String(current_power_watts, 2) + " W</div></div>";
   html += "<div class='card'><h3>Energy (Wh)</h3><div class='val'>" + String(cumulative_wh, 2) + " Wh</div></div>";
-  html += "<div class='card'><h3>DC Rail</h3><div class='val'>" + String(grid_voltage, 1) + " V</div></div>";
+  html += "<div class='card'><h3>DC Rail Voltage</h3><div class='val'>" + String(grid_voltage, 2) + " V</div></div>";
   html += "<div class='card'><h3>Combined Current</h3><div class='val'>" + String(current_amps, 3) + " A</div></div>";
   html += "<div class='card'><h3>PIR Motion</h3><div class='val'><span class='badge " + String(pir_motion ? "on" : "off") + "'>" + String(pir_motion ? "MOTION" : "CLEAR") + "</span></div></div>";
   html += "<div class='card'><h3>IR Obstacle</h3><div class='val'><span class='badge " + String(ir_detected ? "on" : "off") + "'>" + String(ir_detected ? "OBSTACLE" : "CLEAR") + "</span></div></div>";
@@ -492,8 +540,9 @@ void setup() {
   relay1_on = false;
   relay2_on = false;
 
-  // 3. Configure ADC for ACS712 Current Sensor (GPIO 34 / ADC1 CH6)
+  // 3. Configure ADC for Current Sensor (GPIO 34) & Voltage Sensor (GPIO 35)
   pinMode(PIN_ACS712, INPUT);
+  pinMode(PIN_VOLTAGE_SENSOR, INPUT);
   analogReadResolution(12);
   analogSetAttenuation(ADC_11db); // Full range ~3.3V
 
@@ -641,12 +690,21 @@ void loop() {
     unsigned long delta_ms = now - last_energy_calc_ms;
     last_energy_calc_ms = now;
 
-    // Read combined DC current from ACS712 hardware sensor
+    // 1. Read live DC rail voltage from Voltage Sensor module (GPIO 35)
+    readHardwareVoltageSensor();
+
+    // 2. Read combined DC current from ACS712 hardware sensor (GPIO 34)
     readHardwareCurrentSensor();
+
+    if (hardware_voltage_active) {
+      grid_voltage = measured_voltage;
+    } else {
+      grid_voltage = 0.0f;
+    }
 
     if (hardware_current_active) {
       current_amps = measured_current;
-      // DC Power (W) = Voltage (V) * Current (A)
+      // Real DC Power (W) = Live Voltage (V) * Live Current (A)
       current_power_watts = current_amps * grid_voltage;
     } else {
       current_amps = 0.0f;
