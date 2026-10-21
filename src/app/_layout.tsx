@@ -1,52 +1,38 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme, Alert } from 'react-native';
+import { useColorScheme } from 'react-native';
 import { useEffect } from 'react';
 import * as Updates from 'expo-updates';
 import { Stack } from 'expo-router';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    // Safety fallback: Ensure splash screen never hangs permanently
-    const splashTimer = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    }, 1500);
+    // Immediately hide splash screen once UI mounts
+    SplashScreen.hideAsync().catch(() => {});
 
     async function checkForUpdates() {
       try {
-        const update = await Updates.checkForUpdateAsync();
-        if (update.isAvailable) {
-          await Updates.fetchUpdateAsync();
-          Alert.alert(
-            'Update Available',
-            'An update is available! Click to restart',
-            [
-              { text: 'Restart', onPress: async () => await Updates.reloadAsync() }
-            ],
-            { cancelable: false }
-          );
+        if (!__DEV__) {
+          const update = await Updates.checkForUpdateAsync();
+          if (update.isAvailable) {
+            await Updates.fetchUpdateAsync();
+            await Updates.reloadAsync();
+          }
         }
-      } catch (error) {
-        console.log('Error fetching update:', error);
+      } catch {
+        // Silently ignore background update check errors
       }
     }
     
-    if (!__DEV__) {
-      checkForUpdates();
-    }
-
-    return () => clearTimeout(splashTimer);
+    checkForUpdates();
   }, []);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
       </Stack>
