@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -1043,6 +1044,34 @@ export function SettingsView({
           onPress={handleResetConfirm}>
           <ThemedText style={styles.resetBtnText}>Reset Energy to 0.000 kWh</ThemedText>
         </Pressable>
+      </Animated.View>
+
+      {/* 6. Official App Brand Card */}
+      <Animated.View
+        entering={FadeInDown.duration(340).delay(300)}
+        style={[
+          styles.sectionCard,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+            alignItems: 'center',
+            paddingVertical: 22,
+          },
+        ]}>
+        <Image
+          source={require('@/assets/images/icon.png')}
+          style={{ width: 64, height: 64, borderRadius: 16, overflow: 'hidden', marginBottom: 10 }}
+          resizeMode="cover"
+        />
+        <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+          Smart Energy Meter
+        </ThemedText>
+        <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+          Live IoT Power & Room Automation
+        </ThemedText>
+        <ThemedText style={{ fontSize: 11, color: colors.textMuted, marginTop: 4 }}>
+          Version 1.0.0 • Pure 5V DC Edition
+        </ThemedText>
       </Animated.View>
     </ScrollView>
   );

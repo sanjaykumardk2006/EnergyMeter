@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useEnergyMeter } from '@/hooks/useEnergyMeter';
 import { useTheme } from '@/hooks/use-theme';
@@ -331,8 +330,6 @@ export default function ExploreScreen() {
             </View>
           </ThemedView>
         </Collapsible>
-
-        {Platform.OS === 'web' && <WebBadge />}
       </ThemedView>
     </ScrollView>
   );
