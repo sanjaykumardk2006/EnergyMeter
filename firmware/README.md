@@ -4,7 +4,7 @@ Comprehensive documentation for the ESP32-based Smart Energy Management System. 
 
 ---
 
-## ⚠️ CSafety & Electrical Constraints
+## ⚠️ Critical Safety & Electrical Constraints
 
 1. **5V DC PROTOTYPE ONLY**: This prototype is engineered exclusively for **5V DC loads (5V DC bulbs)**. **DO NOT connect 230V AC mains** to this setup.
 2. **ESP32 3.3V GPIO LIMITATION**: ESP32 input pins are **not 5V tolerant**. The HC-SR04 ECHO pin produces a 5V signal and **MUST** pass through a voltage divider (1kΩ / 2kΩ) to safely step down to ~3.3V before entering GPIO 18.
