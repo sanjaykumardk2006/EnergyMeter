@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -51,12 +51,47 @@ export function SettingsView({
   onOpenSystemStatus,
 }: Props) {
   const { colors, isDark, setTheme, toggleTheme } = useTheme();
-  const [timeoutMins, setTimeoutMins] = useState(Math.max(1, Math.round(autoOffDelaySec / 60)));
+  const [prevDistThresh, setPrevDistThresh] = useState(occupancyDistThresholdCm);
   const [distanceThreshold, setDistanceThreshold] = useState(occupancyDistThresholdCm ?? 50);
   const [distInputStr, setDistInputStr] = useState(String(occupancyDistThresholdCm ?? 50));
+
+  if (occupancyDistThresholdCm !== undefined && prevDistThresh !== occupancyDistThresholdCm) {
+    setPrevDistThresh(occupancyDistThresholdCm);
+    setDistanceThreshold(occupancyDistThresholdCm);
+    setDistInputStr(String(occupancyDistThresholdCm));
+  }
+
+  const [prevAutoTarget, setPrevAutoTarget] = useState(autoTarget);
   const [selectedTarget, setSelectedTarget] = useState<1 | 2 | 3>(autoTarget);
+
+  if (prevAutoTarget !== autoTarget) {
+    setPrevAutoTarget(autoTarget);
+    setSelectedTarget(autoTarget);
+  }
+
+  const [prevDelaySec, setPrevDelaySec] = useState(autoOffDelaySec);
+  const [timeoutMins, setTimeoutMins] = useState(Math.max(1, Math.round(autoOffDelaySec / 60)));
+
+  if (prevDelaySec !== autoOffDelaySec) {
+    setPrevDelaySec(autoOffDelaySec);
+    setTimeoutMins(Math.max(1, Math.round(autoOffDelaySec / 60)));
+  }
+
+  const [prevIp, setPrevIp] = useState(ipAddress);
   const [tempIp, setTempIp] = useState(ipAddress);
+
+  if (prevIp !== ipAddress) {
+    setPrevIp(ipAddress);
+    setTempIp(ipAddress);
+  }
+
+  const [prevTariff, setPrevTariff] = useState(tariffRate);
   const [tempTariff, setTempTariff] = useState(String(tariffRate));
+
+  if (prevTariff !== tariffRate) {
+    setPrevTariff(tariffRate);
+    setTempTariff(String(tariffRate));
+  }
 
   // Individual setting update states
   const [isSavingTimeout, setIsSavingTimeout] = useState(false);
@@ -73,22 +108,6 @@ export function SettingsView({
 
   const [isSavingTariff, setIsSavingTariff] = useState(false);
   const [tariffStatus, setTariffStatus] = useState<string | null>(null);
-
-  // Keep local state in sync when remote props change
-  useEffect(() => {
-    if (occupancyDistThresholdCm !== undefined) {
-      setDistanceThreshold(occupancyDistThresholdCm);
-      setDistInputStr(String(occupancyDistThresholdCm));
-    }
-  }, [occupancyDistThresholdCm]);
-
-  useEffect(() => {
-    setSelectedTarget(autoTarget);
-  }, [autoTarget]);
-
-  useEffect(() => {
-    setTimeoutMins(Math.max(1, Math.round(autoOffDelaySec / 60)));
-  }, [autoOffDelaySec]);
 
   // Stepper handlers
   const handleDecTimeout = () => {

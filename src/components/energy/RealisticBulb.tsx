@@ -15,7 +15,6 @@ import { useTheme } from '@/context/ThemeContext';
 interface Props {
   isOn: boolean;
   size?: number; // default 38
-  type?: string;
 }
 
 export function RealisticBulb({ isOn, size = 38 }: Props) {

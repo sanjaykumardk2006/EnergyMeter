@@ -5,15 +5,12 @@ async function fetchWithTimeout(resource: string, options: RequestInit = {}, tim
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(resource, {
+    return await fetch(resource, {
       ...options,
       signal: controller.signal,
     });
+  } finally {
     clearTimeout(id);
-    return response;
-  } catch (error) {
-    clearTimeout(id);
-    throw error;
   }
 }
 
@@ -23,11 +20,10 @@ export class EnergyMeterService {
     if (!cleanIp.startsWith('http://') && !cleanIp.startsWith('https://')) {
       cleanIp = `http://${cleanIp}`;
     }
-    // remove trailing slash
-    if (cleanIp.endsWith('/')) {
-      cleanIp = cleanIp.slice(0, -1);
-    }
-    return `${cleanIp}${path}`;
+    // remove trailing slashes safely
+    cleanIp = cleanIp.replace(/\/+$/, '');
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${cleanIp}${cleanPath}`;
   }
 
   static async getStatus(ip: string): Promise<{ data: EnergyMeterStatus; isMock: boolean }> {
@@ -78,8 +74,8 @@ export class EnergyMeterService {
       if (config.grid_voltage !== undefined) params.append('voltage', String(config.grid_voltage));
       if (config.tariff_rate !== undefined) params.append('tariff', String(config.tariff_rate));
       if (config.auto_off_delay_sec !== undefined) params.append('delay', String(config.auto_off_delay_sec));
-      if (config.dist_threshold_cm !== undefined) params.append('dist_threshold', String(config.dist_threshold_cm));
-      if (config.occupancy_dist_threshold_cm !== undefined) params.append('dist_threshold', String(config.occupancy_dist_threshold_cm));
+      const distThreshold = config.occupancy_dist_threshold_cm ?? config.dist_threshold_cm;
+      if (distThreshold !== undefined) params.append('dist_threshold', String(distThreshold));
       if (config.acs_sens !== undefined) params.append('acs_sens', String(config.acs_sens));
       if (config.calib_i !== undefined) params.append('calib_i', String(config.calib_i));
       if (config.calib_v !== undefined) params.append('calib_v', String(config.calib_v));

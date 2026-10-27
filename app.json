@@ -4,7 +4,7 @@
     "slug": "EnergyMeter",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-logo.png",
     "scheme": "energymeter",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -13,7 +13,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0A1410",
-        "foregroundImage": "./assets/images/android-icon-foreground.png"
+        "foregroundImage": "./assets/images/app-logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.cseeee.EnergyMeter"

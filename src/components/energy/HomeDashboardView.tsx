@@ -228,7 +228,13 @@ export function HomeDashboardView({
 }: Props) {
   const { colors, isDark } = useTheme();
   const timeoutMins = Math.round(autoOffDelaySec / 60);
+  const [prevIpAddress, setPrevIpAddress] = useState<string>(ipAddress);
   const [inputIp, setInputIp] = useState<string>(ipAddress);
+
+  if (prevIpAddress !== ipAddress) {
+    setPrevIpAddress(ipAddress);
+    setInputIp(ipAddress);
+  }
 
   // Live breathing pulse animation for occupancy radar dot
   const pulseAnim = useSharedValue(1);
@@ -251,10 +257,6 @@ export function HomeDashboardView({
     transform: [{ scale: pulseAnim.value }],
     opacity: occupancyDetected ? 1 : 0.6,
   }));
-
-  useEffect(() => {
-    setInputIp(ipAddress);
-  }, [ipAddress]);
 
   const handleConnect = () => {
     if (inputIp.trim()) {

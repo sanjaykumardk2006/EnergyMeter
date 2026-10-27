@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import {
   Modal,
   Platform,
@@ -33,6 +33,19 @@ interface Props {
   onClose: () => void;
 }
 
+function subscribeSeconds(callback: () => void) {
+  const interval = setInterval(callback, 1000);
+  return () => clearInterval(interval);
+}
+
+function getNowSeconds() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function getServerSeconds() {
+  return 0;
+}
+
 export function SystemStatusModal({
   visible,
   isConnected,
@@ -44,11 +57,18 @@ export function SystemStatusModal({
   onClose,
 }: Props) {
   const { colors, isDark } = useTheme();
+  const [prevIp, setPrevIp] = useState(ipAddress);
   const [tempIp, setTempIp] = useState(ipAddress);
+  if (prevIp !== ipAddress) {
+    setPrevIp(ipAddress);
+    setTempIp(ipAddress);
+  }
+
+  const currentSecond = useSyncExternalStore(subscribeSeconds, getNowSeconds, getServerSeconds);
 
   // Formatted last update text
   const timeAgoText = lastUpdated
-    ? `${Math.max(1, Math.round((Date.now() - lastUpdated.getTime()) / 1000))}s ago`
+    ? `${Math.max(1, currentSecond - Math.floor(lastUpdated.getTime() / 1000))}s ago`
     : 'Not connected';
 
   // Real-time Action log history anchored by latest ESP32 reason

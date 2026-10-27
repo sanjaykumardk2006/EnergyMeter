@@ -45,8 +45,8 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
   const [isSwitchingAutoMode, setIsSwitchingAutoMode] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Store user's mode choice (default: Manual Control = false)
-  const userModeChoiceRef = useRef<boolean>(false);
+  // Store user's explicit mode choice if changed by user (null = use device state)
+  const userModeChoiceRef = useRef<boolean | null>(null);
   const isPollingRef = useRef<boolean>(true);
 
   // fetchStatus: Core data fetcher
@@ -55,7 +55,7 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
     if (!ip) return;
     try {
       const { data } = await EnergyMeterService.getStatus(ip);
-      // Preserve user's mode choice so refresh does not force automatic mode
+      // Preserve user's explicit mode choice if chosen, otherwise use device reported state
       const activeMode = userModeChoiceRef.current !== null ? userModeChoiceRef.current : (data.auto_mode ?? false);
       setStatus({
         ...data,
@@ -64,7 +64,7 @@ export function useEnergyMeter(defaultIp = '192.168.1.100') {
       setIsConnected(true);
       setLastUpdated(new Date());
       setErrorMsg(null);
-    } catch (err: any) {
+    } catch {
       setIsConnected(false);
       setErrorMsg(`Cannot connect to ESP32 at ${ip}. Please check IP address & Wi-Fi.`);
     }
