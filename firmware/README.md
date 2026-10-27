@@ -6,7 +6,7 @@ Comprehensive documentation for the ESP32-based Smart Energy Management System. 
 
 ## ⚠️ Critical Safety & Electrical Constraints
 
-1. **5V PROTOTYPE ONLY**: This prototype is engineered exclusively for **5V DC loads (5V DC bulbs)**. **DO NOT connect 230V AC mains** to this setup.
+1. **5V DC PROTOTYPE ONLY**: This prototype is engineered exclusively for **5V DC loads (5V DC bulbs)**. **DO NOT connect 230V AC mains** to this setup.
 2. **ESP32 3.3V GPIO LIMITATION**: ESP32 input pins are **not 5V tolerant**. The HC-SR04 ECHO pin produces a 5V signal and **MUST** pass through a voltage divider (1kΩ / 2kΩ) to safely step down to ~3.3V before entering GPIO 18.
 3. **ACTIVE-LOW RELAY LOGIC**: The dual 5V relay module triggers ON when the input pin is driven **LOW** (0V) and OFF when driven **HIGH** (3.3V/5V). The firmware enforces a safe boot sequence initializing all relays to OFF (`HIGH`).
 4. **SERIES CURRENT MONITORING**: The single ACS712 module measures the **combined total current** flowing into both 5V DC bulb loads through its series sensing path. It does **not** measure Load 1 and Load 2 independently.
