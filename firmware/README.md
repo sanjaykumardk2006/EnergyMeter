@@ -13,7 +13,7 @@ Comprehensive documentation for the ESP32-based Smart Energy Management System. 
 
 ---
 
-## 📌 Hardware Pi
+## 📌 Hardware Pipelines
 | Component | Pin | ESP32 Pin | Logic / Function |
 | :--- | :--- | :--- | :--- |
 | **IR Sensor** | VCC | `3V3` or `5V` | Power supply |
