@@ -43,7 +43,10 @@ function MainAppContent() {
     resetEnergy,
     refresh,
     connectToIp,
-    simulateSensorTrigger,
+    actionError,
+    dismissActionError,
+    loadActiveSec,
+    errorMsg,
   } = useEnergyMeter();
 
   const voltage = status?.voltage ?? 0.0;
@@ -120,7 +123,9 @@ function MainAppContent() {
               onOpenLoadDetail={(id) => setLoadDetailModal({ visible: true, loadId: id })}
               onOpenSettings={() => setActiveTab('settings')}
               onOpenSystemStatus={() => setSystemStatusVisible(true)}
-              onSimulateSensorTrigger={simulateSensorTrigger}
+              errorMsg={errorMsg}
+              actionError={actionError}
+              onDismissActionError={dismissActionError}
             />
           </Animated.View>
         )}
@@ -144,7 +149,7 @@ function MainAppContent() {
               autoMode={autoMode}
               relay1={relay1}
               relay2={relay2}
-              onSimulateSensorTrigger={simulateSensorTrigger}
+              isConnected={isConnected}
             />
           </Animated.View>
         )}
@@ -164,6 +169,10 @@ function MainAppContent() {
               totalKwh={totalKwh}
               costEstimate={costEstimate}
               tariffRate={tariffRate}
+              isConnected={isConnected}
+              loadActiveSec={loadActiveSec}
+              relay1={relay1}
+              relay2={relay2}
             />
           </Animated.View>
         )}

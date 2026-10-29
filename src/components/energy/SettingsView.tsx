@@ -19,14 +19,14 @@ import { useTheme } from '@/context/ThemeContext';
 import { ColorfulIcon } from './ColorfulIcon';
 
 interface Props {
-  autoMode: boolean;
+  autoMode?: boolean;
   autoTarget: 1 | 2 | 3;
   autoOffDelaySec: number;
   occupancyDistThresholdCm?: number;
   ipAddress: string;
   tariffRate: number;
   voltage?: number;
-  onToggleAutoMode: () => void;
+  onToggleAutoMode?: () => void;
   onUpdateTarget: (target: 1 | 2 | 3) => void;
   onUpdateDelay: (delaySec: number) => void;
   onSaveConfig: (config: any) => Promise<boolean>;
@@ -468,102 +468,7 @@ export function SettingsView({
         </View>
       </Animated.View>
 
-      {/* 2. Control Mode Card with Colorful Icons */}
-      <Animated.View
-        entering={FadeInDown.duration(340).delay(110)}
-        style={[
-          styles.sectionCard,
-          { backgroundColor: colors.card, borderColor: colors.cardBorder },
-        ]}>
-        <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Control Mode</ThemedText>
-        <View
-          style={[
-            styles.modeSelectorContainer,
-            {
-              backgroundColor: isDark ? 'rgba(5, 150, 105, 0.12)' : '#ECFDF5',
-              borderColor: isDark ? 'rgba(5, 150, 105, 0.35)' : '#A7F3D0',
-              borderWidth: 1.5,
-            },
-          ]}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.modeSegment,
-              !autoMode
-                ? [styles.modeSegmentActive, { backgroundColor: colors.primary }]
-                : { backgroundColor: 'transparent' },
-              pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 },
-            ]}
-            onPress={() => {
-              if (autoMode) onToggleAutoMode();
-            }}>
-            <View
-              style={[
-                styles.modeSegmentIconSquircle,
-                {
-                  backgroundColor: !autoMode
-                    ? 'rgba(255, 255, 255, 0.24)'
-                    : isDark
-                    ? 'rgba(255, 255, 255, 0.08)'
-                    : 'rgba(5, 150, 105, 0.12)',
-                },
-              ]}>
-              <MaterialCommunityIcons
-                name="gesture-tap"
-                size={17}
-                color={!autoMode ? '#FFFFFF' : isDark ? '#A7F3D0' : colors.primary}
-              />
-            </View>
-            <ThemedText
-              style={[
-                styles.modeSegmentText,
-                { color: !autoMode ? '#FFFFFF' : isDark ? '#A7F3D0' : '#047857' },
-                !autoMode && styles.modeSegmentTextActive,
-              ]}>
-              Manual Control
-            </ThemedText>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.modeSegment,
-              autoMode
-                ? [styles.modeSegmentActive, { backgroundColor: colors.primary }]
-                : { backgroundColor: 'transparent' },
-              pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 },
-            ]}
-            onPress={() => {
-              if (!autoMode) onToggleAutoMode();
-            }}>
-            <View
-              style={[
-                styles.modeSegmentIconSquircle,
-                {
-                  backgroundColor: autoMode
-                    ? 'rgba(255, 255, 255, 0.24)'
-                    : isDark
-                    ? 'rgba(255, 255, 255, 0.08)'
-                    : 'rgba(5, 150, 105, 0.12)',
-                },
-              ]}>
-              <MaterialCommunityIcons
-                name="robot"
-                size={17}
-                color={autoMode ? '#FFFFFF' : isDark ? '#A7F3D0' : colors.primary}
-              />
-            </View>
-            <ThemedText
-              style={[
-                styles.modeSegmentText,
-                { color: autoMode ? '#FFFFFF' : isDark ? '#A7F3D0' : '#047857' },
-                autoMode && styles.modeSegmentTextActive,
-              ]}>
-              Smart Control
-            </ThemedText>
-          </Pressable>
-        </View>
-      </Animated.View>
-
-      {/* 3. Smart Control Settings Card with Colorful Icons */}
+      {/* 2. Smart Control Settings Card with Colorful Icons */}
       <Animated.View
         entering={FadeInDown.duration(340).delay(160)}
         style={[

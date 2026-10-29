@@ -31,6 +31,7 @@ export interface EnergyMeterStatus {
   acs_sensitivity?: number;
   calib_i?: number;
   calib_v?: number;
+  load_active_sec?: number;
 }
 
 export interface EnergyMeterConfig {
@@ -44,4 +45,5 @@ export interface EnergyMeterConfig {
   acs_sens?: number;
   calib_i?: number;
   calib_v?: number;
+  load_active_sec?: number;
 }

@@ -14,6 +14,10 @@ interface Props {
   totalKwh: number;
   costEstimate: number;
   tariffRate: number;
+  isConnected?: boolean;
+  loadActiveSec?: number;
+  relay1?: boolean;
+  relay2?: boolean;
 }
 
 export function EnergyView({
@@ -24,14 +28,16 @@ export function EnergyView({
   totalKwh,
   costEstimate,
   tariffRate,
+  isConnected = false,
+  loadActiveSec = 0,
+  relay1 = false,
+  relay2 = false,
 }: Props) {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<'Live' | 'Daily' | 'Weekly' | 'Monthly'>('Daily');
 
-  // Estimate active time based on energy consumed vs current power
-  const activeHours = powerWatts > 0.05
-    ? Math.max(0.5, (totalKwh * 1000) / Math.max(1, powerWatts))
-    : 2.5;
+  // Accurately calculated active hours based on hardware tracking and load state
+  const activeHours = isConnected ? (loadActiveSec / 3600) : 0;
 
   return (
     <ScrollView
@@ -82,10 +88,10 @@ export function EnergyView({
             Voltage
           </ThemedText>
           <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
-            {voltage.toFixed(2)} V
+            {isConnected ? voltage.toFixed(2) : '0.00'} V
           </ThemedText>
           <ThemedText style={[styles.metricSub, { color: hardwareVoltageActive ? '#D97706' : colors.textMuted }]}>
-            {hardwareVoltageActive ? 'GPIO 35 • Live Rail' : 'No Voltage (Standby)'}
+            {isConnected ? (hardwareVoltageActive ? 'GPIO 35 • Live Rail' : 'No Voltage (Standby)') : 'Hardware Disconnected'}
           </ThemedText>
         </Animated.View>
 
@@ -108,10 +114,10 @@ export function EnergyView({
             Current
           </ThemedText>
           <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
-            {currentAmps.toFixed(2)} A
+            {isConnected ? currentAmps.toFixed(2) : '0.00'} A
           </ThemedText>
           <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
-            Total Load
+            {isConnected ? 'Total Load' : 'Hardware Disconnected'}
           </ThemedText>
         </Animated.View>
 
@@ -134,10 +140,10 @@ export function EnergyView({
             Power
           </ThemedText>
           <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
-            {powerWatts.toFixed(2)} W
+            {isConnected ? powerWatts.toFixed(2) : '0.00'} W
           </ThemedText>
           <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
-            Voltage × Current
+            {isConnected ? 'Voltage × Current' : 'Hardware Disconnected'}
           </ThemedText>
         </Animated.View>
 
@@ -160,10 +166,10 @@ export function EnergyView({
             Energy
           </ThemedText>
           <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
-            {totalKwh.toFixed(3)} kWh
+            {isConnected ? totalKwh.toFixed(3) : '0.000'} kWh
           </ThemedText>
           <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
-            Total Accumulation
+            {isConnected ? 'Total Accumulation' : 'Hardware Disconnected'}
           </ThemedText>
         </Animated.View>
       </Animated.View>
@@ -198,7 +204,7 @@ export function EnergyView({
 
       {/* Power Consumption (W) Chart */}
       <Animated.View entering={FadeInDown.duration(340).delay(180)}>
-        <PowerConsumptionChart currentPowerWatts={powerWatts} />
+        <PowerConsumptionChart currentPowerWatts={powerWatts} filter={filter} isConnected={isConnected} />
       </Animated.View>
 
       {/* Bottom Summary Stats Cards with Colorful Icons */}
@@ -223,10 +229,10 @@ export function EnergyView({
               Estimated Cost
             </ThemedText>
             <ThemedText style={[styles.summaryNumber, { color: colors.text }]}>
-              ₹{costEstimate.toFixed(2)}
+              {isConnected ? `₹${costEstimate.toFixed(2)}` : '₹0.00'}
             </ThemedText>
             <ThemedText style={[styles.summarySub, { color: colors.textMuted }]}>
-              Today @ ₹{tariffRate.toFixed(1)}/kWh
+              {isConnected ? `Today @ ₹${tariffRate.toFixed(1)}/kWh` : 'Hardware Disconnected'}
             </ThemedText>
           </View>
         </View>
@@ -249,10 +255,10 @@ export function EnergyView({
               Active Time
             </ThemedText>
             <ThemedText style={[styles.summaryNumber, { color: colors.text }]}>
-              {activeHours.toFixed(1)} hours
+              {isConnected ? `${activeHours.toFixed(1)} hours` : '0.0 hours'}
             </ThemedText>
             <ThemedText style={[styles.summarySub, { color: colors.textMuted }]}>
-              Today Active
+              {isConnected ? (relay1 || relay2 ? 'Loads Currently Active' : 'Loads Standby / Idle') : 'Hardware Disconnected'}
             </ThemedText>
           </View>
         </View>

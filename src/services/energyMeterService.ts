@@ -39,7 +39,15 @@ export class EnergyMeterService {
   static async setRelay(ip: string, relayId: 1 | 2, state: boolean): Promise<boolean> {
     try {
       const url = this.formatUrl(ip, `/api/relay?id=${relayId}&state=${state ? 1 : 0}`);
-      const res = await fetchWithTimeout(url, { method: 'POST' }, 3000);
+      const res = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: relayId, state: state ? 1 : 0 }),
+        },
+        3500
+      );
       return res.ok;
     } catch (err) {
       console.warn('Failed to set relay:', err);
@@ -55,7 +63,15 @@ export class EnergyMeterService {
         params.append('target', String(target));
       }
       const url = this.formatUrl(ip, `/api/auto-mode?${params.toString()}`);
-      const res = await fetchWithTimeout(url, { method: 'POST' }, 3000);
+      const res = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: state ? 1 : 0, target }),
+        },
+        3500
+      );
       return res.ok;
     } catch (err) {
       console.warn('Failed to set auto mode:', err);
@@ -81,7 +97,15 @@ export class EnergyMeterService {
       if (config.calib_v !== undefined) params.append('calib_v', String(config.calib_v));
 
       const url = this.formatUrl(ip, `/api/config?${params.toString()}`);
-      const res = await fetchWithTimeout(url, { method: 'POST' }, 3000);
+      const res = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        },
+        3500
+      );
       return res.ok;
     } catch (err) {
       console.warn('Failed to update config:', err);
@@ -92,7 +116,7 @@ export class EnergyMeterService {
   static async resetEnergy(ip: string): Promise<boolean> {
     try {
       const url = this.formatUrl(ip, '/api/reset-energy');
-      const res = await fetchWithTimeout(url, { method: 'POST' }, 3000);
+      const res = await fetchWithTimeout(url, { method: 'POST' }, 3500);
       return res.ok;
     } catch (err) {
       console.warn('Failed to reset energy:', err);

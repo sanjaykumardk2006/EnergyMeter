@@ -99,6 +99,7 @@ double cumulative_wh = 0.0;           // Accumulated energy in Watt-hours
 double cumulative_kwh = 0.0;          // Accumulated energy in Kilowatt-hours
 float current_power_watts = 0.0;      // Real-time Power (W)
 float current_amps = 0.0;             // Real-time Current (A)
+unsigned long load_active_sec = 0;    // Cumulative active on-time for loads (seconds)
 
 // Smart Automation Configuration
 bool auto_mode = false;               // False = Manual Control (Default), True = Smart Control
@@ -323,6 +324,7 @@ void handleGetStatus() {
   json += "\"total_wh\":" + String(cumulative_wh, 2) + ",";
   json += "\"total_kwh\":" + String(cumulative_kwh, 5) + ",";
   json += "\"cost_estimate\":" + String(cumulative_kwh * tariff_rate, 3) + ",";
+  json += "\"load_active_sec\":" + String(load_active_sec) + ",";
   json += "\"tariff_rate\":" + String(tariff_rate, 2) + ",";
   json += "\"last_action_reason\":\"" + last_action_reason + "\",";
   json += "\"hardware_sensors\":true,";
@@ -474,6 +476,7 @@ void handleResetEnergy() {
   sendCORS();
   cumulative_wh = 0.0;
   cumulative_kwh = 0.0;
+  load_active_sec = 0;
   saveEnergyToFlash();
   server.send(200, "application/json", "{\"success\":true,\"message\":\"Energy meter reset to 0 Wh\"}");
 }
@@ -741,6 +744,11 @@ void loop() {
     double delta_wh = (double)current_power_watts * delta_hours;
     cumulative_wh += delta_wh;
     cumulative_kwh = cumulative_wh / 1000.0;
+
+    // Track accurate active on-time whenever loads are powered
+    if (relay1_on || relay2_on || current_amps > 0.05f) {
+      load_active_sec += (delta_ms / 1000);
+    }
   }
 
   // ---------------------------------------------------------------------------

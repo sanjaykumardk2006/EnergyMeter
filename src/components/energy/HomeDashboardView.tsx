@@ -183,8 +183,9 @@ interface Props {
   irDetected?: boolean;
   distanceCm?: number;
   distanceValid?: boolean;
+  errorMsg?: string | null;
   onConnect: (ip: string) => void;
-  onRefresh: () => void;
+  onRefresh: (ip?: string) => void;
   onSetAutoMode: (mode: boolean) => void;
   onToggleAutoMode?: () => void;
   onToggleRelay1: () => void;
@@ -192,7 +193,8 @@ interface Props {
   onOpenLoadDetail: (id: 1 | 2) => void;
   onOpenSettings: () => void;
   onOpenSystemStatus: () => void;
-  onSimulateSensorTrigger?: (sensor: 'pir' | 'ir' | 'ultrasonic' | 'clear') => void;
+  actionError?: string | null;
+  onDismissActionError?: () => void;
 }
 
 export function HomeDashboardView({
@@ -216,7 +218,10 @@ export function HomeDashboardView({
   irDetected = false,
   distanceCm = 0,
   distanceValid = true,
+  errorMsg = null,
   onConnect,
+  actionError,
+  onDismissActionError,
   onRefresh,
   onSetAutoMode,
   onToggleRelay1,
@@ -224,7 +229,6 @@ export function HomeDashboardView({
   onOpenLoadDetail,
   onOpenSettings,
   onOpenSystemStatus,
-  onSimulateSensorTrigger,
 }: Props) {
   const { colors, isDark } = useTheme();
   const timeoutMins = Math.round(autoOffDelaySec / 60);
@@ -258,10 +262,44 @@ export function HomeDashboardView({
     opacity: occupancyDetected ? 1 : 0.6,
   }));
 
-  const handleConnect = () => {
-    if (inputIp.trim()) {
-      onConnect(inputIp.trim());
+  const [localIpError, setLocalIpError] = useState<string | null>(null);
+
+  const isValidIpOrHost = (ip: string) => {
+    const clean = ip.trim();
+    if (!clean) return false;
+    const hostPortMatch = clean.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?$/);
+    if (hostPortMatch) {
+      const parts = hostPortMatch[1].split('.').map(Number);
+      const validOctets = parts.every((p) => p >= 0 && p <= 255);
+      if (!validOctets) return false;
+      if (hostPortMatch[2]) {
+        const port = Number(hostPortMatch[2]);
+        if (port <= 0 || port > 65535) return false;
+      }
+      return true;
     }
+    if (/^localhost(?::\d+)?$/i.test(clean)) return true;
+    return false;
+  };
+
+  const handleConnect = () => {
+    const clean = inputIp.trim();
+    if (!clean || !isValidIpOrHost(clean)) {
+      setLocalIpError('Please enter the correct IP address (e.g. 192.168.1.100)');
+      return;
+    }
+    setLocalIpError(null);
+    onConnect(clean);
+  };
+
+  const handleRefresh = () => {
+    const clean = inputIp.trim();
+    if (!clean || !isValidIpOrHost(clean)) {
+      setLocalIpError('Please enter the correct IP address (e.g. 192.168.1.100)');
+      return;
+    }
+    setLocalIpError(null);
+    onRefresh(clean);
   };
 
   return (
@@ -272,7 +310,7 @@ export function HomeDashboardView({
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
-          onRefresh={onRefresh}
+          onRefresh={handleRefresh}
           colors={[colors.primary]}
           tintColor={colors.primary}
         />
@@ -343,7 +381,7 @@ export function HomeDashboardView({
               pressed && styles.buttonPressed,
               (isRefreshing || isConnecting) && styles.buttonDisabled,
             ]}
-            onPress={onRefresh}
+            onPress={handleRefresh}
             disabled={isRefreshing || isConnecting}>
             {isRefreshing ? (
               <ActivityIndicator size="small" color={colors.primary} />
@@ -362,14 +400,28 @@ export function HomeDashboardView({
           <View
             style={[
               styles.ipInputWrapper,
-              { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: (localIpError || (!isConnected && errorMsg))
+                  ? colors.danger
+                  : colors.inputBorder,
+              },
             ]}>
-            <Ionicons name="globe-outline" size={17} color={colors.textMuted} />
+            <Ionicons
+              name="globe-outline"
+              size={17}
+              color={(localIpError || (!isConnected && errorMsg)) ? colors.danger : colors.textMuted}
+            />
             <TextInput
               style={[styles.ipTextInput, { color: colors.text }]}
               value={inputIp}
-              onChangeText={setInputIp}
-              placeholder="e.g. 192.168.4.1"
+              onChangeText={(text) => {
+                setInputIp(text);
+                if (localIpError) {
+                  setLocalIpError(null);
+                }
+              }}
+              placeholder="e.g. 192.168.1.100"
               placeholderTextColor={colors.textMuted}
               keyboardType="url"
               autoCapitalize="none"
@@ -399,34 +451,14 @@ export function HomeDashboardView({
           </Pressable>
         </View>
 
-        <View style={[styles.connectionCardFooter, { borderTopColor: colors.divider }]}>
-          <ThemedText style={[styles.lastSyncText, { color: colors.textMuted }]}>
-            {lastUpdated
-              ? `Synced ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
-              : 'Not synced yet'}
-          </ThemedText>
-          <View style={styles.presetChips}>
-            {['192.168.4.1', '192.168.1.100'].map((preset) => (
-              <Pressable
-                key={preset}
-                style={[
-                  styles.presetChip,
-                  {
-                    backgroundColor: colors.primaryTint,
-                    borderColor: colors.primaryBorder,
-                  },
-                ]}
-                onPress={() => {
-                  setInputIp(preset);
-                  onConnect(preset);
-                }}>
-                <ThemedText style={[styles.presetChipText, { color: colors.primaryHover }]}>
-                  {preset === '192.168.4.1' ? 'AP: .4.1' : 'STA: .1.100'}
-                </ThemedText>
-              </Pressable>
-            ))}
+        {(localIpError || (!isConnected && errorMsg)) && (
+          <View style={styles.ipErrorContainer}>
+            <Ionicons name="alert-circle" size={15} color={colors.danger} />
+            <ThemedText style={[styles.ipErrorText, { color: colors.danger }]}>
+              {localIpError || 'Cannot connect to ESP32: Please enter the correct IP address'}
+            </ThemedText>
           </View>
-        </View>
+        )}
       </Animated.View>
 
       {/* 3. Colorful Mode Toggle: Manual Control vs Smart Control */}
@@ -572,86 +604,6 @@ export function HomeDashboardView({
         </Animated.View>
       )}
 
-      {/* Sensor Test Strip (shown in Smart Control mode when simulator is available) */}
-      {autoMode && onSimulateSensorTrigger && (
-        <Animated.View
-          entering={FadeInDown.duration(340).delay(190)}
-          style={[
-            styles.sensorTestStrip,
-            {
-              backgroundColor: isDark ? 'rgba(30, 41, 59, 0.6)' : '#F8FAFC',
-              borderColor: colors.cardBorder,
-            },
-          ]}>
-          <ThemedText style={[styles.sensorTestTitle, { color: colors.textSecondary }]}>
-            Interactive Sensor Simulation (Test Smart Cutoff):
-          </ThemedText>
-          <View style={styles.sensorTestChips}>
-            <Pressable
-              style={[
-                styles.sensorChip,
-                pirMotion
-                  ? { backgroundColor: '#7C3AED', borderColor: '#A78BFA' }
-                  : { backgroundColor: isDark ? colors.card : '#FFFFFF', borderColor: colors.cardBorder },
-              ]}
-              onPress={() => onSimulateSensorTrigger('pir')}>
-              <ThemedText
-                style={[
-                  styles.sensorChipText,
-                  { color: pirMotion ? '#FFFFFF' : colors.textSecondary },
-                ]}>
-                PIR: {pirMotion ? 'Detected' : 'Clear'}
-              </ThemedText>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.sensorChip,
-                irDetected
-                  ? { backgroundColor: '#E11D48', borderColor: '#FDA4AF' }
-                  : { backgroundColor: isDark ? colors.card : '#FFFFFF', borderColor: colors.cardBorder },
-              ]}
-              onPress={() => onSimulateSensorTrigger('ir')}>
-              <ThemedText
-                style={[
-                  styles.sensorChipText,
-                  { color: irDetected ? '#FFFFFF' : colors.textSecondary },
-                ]}>
-                IR: {irDetected ? 'Detected' : 'Clear'}
-              </ThemedText>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.sensorChip,
-                distanceValid && distanceCm > 0 && distanceCm <= 50
-                  ? { backgroundColor: '#0284C7', borderColor: '#7DD3FC' }
-                  : { backgroundColor: isDark ? colors.card : '#FFFFFF', borderColor: colors.cardBorder },
-              ]}
-              onPress={() => onSimulateSensorTrigger('ultrasonic')}>
-              <ThemedText
-                style={[
-                  styles.sensorChipText,
-                  { color: distanceValid && distanceCm > 0 && distanceCm <= 50 ? '#FFFFFF' : colors.textSecondary },
-                ]}>
-                US: {distanceValid && distanceCm > 0 && distanceCm <= 50 ? `${distanceCm.toFixed(0)}cm` : 'Clear'}
-              </ThemedText>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.sensorChip,
-                { backgroundColor: '#DC2626', borderColor: '#FCA5A5' },
-              ]}
-              onPress={() => onSimulateSensorTrigger('clear')}>
-              <ThemedText style={[styles.sensorChipText, { color: '#FFFFFF', fontWeight: '700' }]}>
-                Clear All (Loads OFF)
-              </ThemedText>
-            </Pressable>
-          </View>
-        </Animated.View>
-      )}
-
       {/* 5. Lights Control Section with Glowing Light Cards */}
       <Animated.View
         entering={FadeInDown.duration(340).delay(210)}
@@ -748,10 +700,10 @@ export function HomeDashboardView({
               Voltage
             </ThemedText>
             <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
-              {voltage.toFixed(2)} V
+              {isConnected ? voltage.toFixed(2) : '0.00'} V
             </ThemedText>
             <ThemedText style={[styles.metricSub, { color: hardwareVoltageActive ? '#D97706' : colors.textMuted }]}>
-              {hardwareVoltageActive ? 'GPIO 35 • Live Rail' : 'No Voltage (Standby)'}
+              {isConnected ? (hardwareVoltageActive ? 'GPIO 35 • Live Rail' : 'No Voltage (Standby)') : 'Hardware Disconnected'}
             </ThemedText>
           </Animated.View>
 
@@ -773,10 +725,10 @@ export function HomeDashboardView({
               Current
             </ThemedText>
             <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
-              {currentAmps.toFixed(2)} A
+              {isConnected ? currentAmps.toFixed(2) : '0.00'} A
             </ThemedText>
             <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
-              Total Load
+              {isConnected ? 'Total Load' : 'Hardware Disconnected'}
             </ThemedText>
           </Animated.View>
 
@@ -798,10 +750,10 @@ export function HomeDashboardView({
               Power
             </ThemedText>
             <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
-              {powerWatts.toFixed(2)} W
+              {isConnected ? powerWatts.toFixed(2) : '0.00'} W
             </ThemedText>
             <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
-              Voltage × Current
+              {isConnected ? 'Voltage × Current' : 'Hardware Disconnected'}
             </ThemedText>
           </Animated.View>
 
@@ -823,10 +775,10 @@ export function HomeDashboardView({
               Energy
             </ThemedText>
             <ThemedText style={[styles.metricNumber, { color: colors.text }]}>
-              {totalKwh.toFixed(3)} kWh
+              {isConnected ? totalKwh.toFixed(3) : '0.000'} kWh
             </ThemedText>
             <ThemedText style={[styles.metricSub, { color: colors.textMuted }]}>
-              Total Accumulation
+              {isConnected ? 'Total Accumulation' : 'Hardware Disconnected'}
             </ThemedText>
           </Animated.View>
         </View>
@@ -1155,30 +1107,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  connectionCardFooter: {
+  ipErrorContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-  },
-  lastSyncText: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  presetChips: {
-    flexDirection: 'row',
     gap: 6,
+    paddingHorizontal: 2,
+    marginTop: -2,
   },
-  presetChip: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  presetChipText: {
-    fontSize: 10,
+  ipErrorText: {
+    fontSize: 12,
     fontWeight: '600',
+    flex: 1,
   },
   buttonPressed: {
     opacity: 0.7,
@@ -1210,30 +1149,5 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 0.5,
-  },
-  sensorTestStrip: {
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  sensorTestTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sensorTestChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  sensorChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  sensorChipText: {
-    fontSize: 11,
-    fontWeight: '600',
   },
 });

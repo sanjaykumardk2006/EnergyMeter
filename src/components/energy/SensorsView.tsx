@@ -16,7 +16,7 @@ interface Props {
   autoMode?: boolean;
   relay1?: boolean;
   relay2?: boolean;
-  onSimulateSensorTrigger?: (sensor: 'pir' | 'ir' | 'ultrasonic' | 'clear') => void;
+  isConnected?: boolean;
 }
 
 export function SensorsView({
@@ -31,15 +31,16 @@ export function SensorsView({
   autoMode = false,
   relay1 = false,
   relay2 = false,
-  onSimulateSensorTrigger,
+  isConnected = false,
 }: Props) {
   const { colors, isDark } = useTheme();
-  const isNearby = distanceValid && distanceCm > 0 && distanceCm < 120;
-  const distPercent = distanceValid ? Math.min(100, Math.max(4, (distanceCm / 200) * 100)) : 0;
-  const isOccupied = pirMotion || irDetected || isNearby;
-  const liveVoltage = measuredVoltage ?? voltage;
-  const isVoltageLive = hardwareVoltageActive ?? (liveVoltage > 0.4);
+  const isNearby = isConnected && distanceValid && distanceCm > 0 && distanceCm < 120;
+  const distPercent = isConnected && distanceValid ? Math.min(100, Math.max(4, (distanceCm / 200) * 100)) : 0;
+  const isOccupied = isConnected && (pirMotion || irDetected || isNearby);
+  const liveVoltage = isConnected ? (measuredVoltage ?? voltage) : 0.0;
+  const isVoltageLive = isConnected && (hardwareVoltageActive ?? (liveVoltage > 0.4));
   const voltPercent = isVoltageLive ? Math.min(100, Math.max(4, (liveVoltage / 6.0) * 100)) : 0;
+  const displayCurrent = isConnected ? currentAmps : 0.0;
 
   return (
     <ScrollView
@@ -101,7 +102,9 @@ export function SensorsView({
                 styles.ruleBannerTitle,
                 { color: isOccupied ? colors.primary : '#EF4444' },
               ]}>
-              {isOccupied
+              {!isConnected
+                ? 'ESP32 Disconnected • Awaiting Connection'
+                : isOccupied
                 ? 'Presence Detected • Smart Lights Active'
                 : 'All Sensors Clear • Loads Automatically OFF'}
             </ThemedText>
@@ -119,73 +122,6 @@ export function SensorsView({
           </View>
         </View>
 
-        {onSimulateSensorTrigger && (
-          <View style={[styles.testRow, { borderTopColor: colors.divider }]}>
-            <ThemedText style={[styles.testHeading, { color: colors.textSecondary }]}>
-              Simulate Sensors:
-            </ThemedText>
-            <View style={styles.testButtons}>
-              <Pressable
-                style={[
-                  styles.testBtn,
-                  pirMotion
-                    ? { backgroundColor: '#7C3AED', borderColor: '#A78BFA' }
-                    : { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                ]}
-                onPress={() => onSimulateSensorTrigger('pir')}>
-                <ThemedText
-                  style={[
-                    styles.testBtnText,
-                    { color: pirMotion ? '#FFFFFF' : colors.textSecondary },
-                  ]}>
-                  PIR {pirMotion ? 'ON' : 'OFF'}
-                </ThemedText>
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.testBtn,
-                  irDetected
-                    ? { backgroundColor: '#E11D48', borderColor: '#FDA4AF' }
-                    : { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                ]}
-                onPress={() => onSimulateSensorTrigger('ir')}>
-                <ThemedText
-                  style={[
-                    styles.testBtnText,
-                    { color: irDetected ? '#FFFFFF' : colors.textSecondary },
-                  ]}>
-                  IR {irDetected ? 'ON' : 'OFF'}
-                </ThemedText>
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.testBtn,
-                  distanceCm > 0 && distanceCm <= 50
-                    ? { backgroundColor: '#0284C7', borderColor: '#7DD3FC' }
-                    : { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                ]}
-                onPress={() => onSimulateSensorTrigger('ultrasonic')}>
-                <ThemedText
-                  style={[
-                    styles.testBtnText,
-                    { color: distanceCm > 0 && distanceCm <= 50 ? '#FFFFFF' : colors.textSecondary },
-                  ]}>
-                  US {distanceCm > 0 && distanceCm <= 50 ? 'Near' : 'Far'}
-                </ThemedText>
-              </Pressable>
-
-              <Pressable
-                style={[styles.testBtn, { backgroundColor: '#DC2626', borderColor: '#FCA5A5' }]}
-                onPress={() => onSimulateSensorTrigger('clear')}>
-                <ThemedText style={[styles.testBtnText, { color: '#FFFFFF', fontWeight: '700' }]}>
-                  Clear All
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
-        )}
       </Animated.View>
 
       <View style={styles.cardsList}>
@@ -233,17 +169,17 @@ export function SensorsView({
                   styles.statusBadgeText,
                   { color: pirMotion ? '#7C3AED' : colors.textSecondary },
                 ]}>
-                {pirMotion ? '● Motion Active' : '● Clear'}
+                {isConnected ? (pirMotion ? '● Motion Active' : '● Clear') : '● Offline'}
               </ThemedText>
             </View>
           </View>
 
           <View style={[styles.cardFooter, { borderTopColor: colors.divider }]}>
             <ThemedText style={[styles.footerValText, { color: colors.textSecondary }]}>
-              Pin GPIO27: {pirMotion ? 'HIGH (3.3V Triggered)' : 'LOW (0V Idle)'}
+              Pin GPIO33: {isConnected ? (pirMotion ? 'HIGH (Triggered)' : 'LOW (Idle)') : 'Hardware Disconnected'}
             </ThemedText>
             <ThemedText style={[styles.footerTimeText, { color: colors.textMuted }]}>
-              Live Telemetry
+              {isConnected ? 'Live Telemetry' : 'Awaiting ESP32'}
             </ThemedText>
           </View>
         </Animated.View>
@@ -292,7 +228,7 @@ export function SensorsView({
                   styles.statusBadgeText,
                   { color: irDetected ? '#E11D48' : colors.textSecondary },
                 ]}>
-                {irDetected ? '● Beam Obstructed' : '● Path Clear'}
+                {isConnected ? (irDetected ? '● Beam Obstructed' : '● Path Clear') : '● Offline'}
               </ThemedText>
             </View>
           </View>
@@ -302,7 +238,7 @@ export function SensorsView({
               Pin GPIO26: {irDetected ? 'LOW (Active-LOW Detect)' : 'HIGH (Clear)'}
             </ThemedText>
             <ThemedText style={[styles.footerTimeText, { color: colors.textMuted }]}>
-              Live Telemetry
+              {isConnected ? 'Live Telemetry' : 'Awaiting ESP32'}
             </ThemedText>
           </View>
         </Animated.View>
@@ -382,12 +318,12 @@ export function SensorsView({
                 : 'Echo timeout'}
             </ThemedText>
             <ThemedText style={[styles.footerTimeText, { color: colors.textMuted }]}>
-              Live Telemetry
+              {isConnected ? 'Live Telemetry' : 'Awaiting ESP32'}
             </ThemedText>
           </View>
         </Animated.View>
 
-        {/* 4. ACS712 Current Sensor Card */}
+        {/* 4. Current Sensor Card */}
         <Animated.View
           entering={FadeInDown.duration(340).delay(210)}
           style={[
@@ -405,7 +341,7 @@ export function SensorsView({
               />
               <View style={{ flex: 1, paddingRight: 6 }}>
                 <ThemedText style={[styles.sensorName, { color: colors.text }]}>
-                  ACS712 Current Sensor
+                  Current Sensor
                 </ThemedText>
                 <ThemedText style={[styles.sensorDesc, { color: colors.textSecondary }]}>
                   Combined Load (Light 1 + Light 2)
@@ -423,17 +359,17 @@ export function SensorsView({
                 },
               ]}>
               <ThemedText style={[styles.statusBadgeText, { color: colors.primary }]}>
-                {currentAmps.toFixed(2)} A
+                {displayCurrent.toFixed(2)} A
               </ThemedText>
             </View>
           </View>
 
           <View style={[styles.cardFooter, { borderTopColor: colors.divider }]}>
             <ThemedText style={[styles.footerValText, { color: colors.textSecondary }]}>
-              ADC1 CH6: {currentAmps > 0.05 ? 'Load Drawing Current' : 'Zero/Quiescent Load'}
+              ADC1 CH6: {isConnected ? (displayCurrent > 0.05 ? 'Load Drawing Current' : 'Zero/Quiescent Load') : 'Hardware Disconnected'}
             </ThemedText>
             <ThemedText style={[styles.footerTimeText, { color: colors.textMuted }]}>
-              Live Telemetry
+              {isConnected ? 'Live Telemetry' : 'Awaiting ESP32'}
             </ThemedText>
           </View>
         </Animated.View>
@@ -520,7 +456,7 @@ export function SensorsView({
               ADC1 CH7: {isVoltageLive ? `5:1 Divider Active • P = ${(liveVoltage * currentAmps).toFixed(2)} W` : 'No Voltage Detected'}
             </ThemedText>
             <ThemedText style={[styles.footerTimeText, { color: colors.textMuted }]}>
-              Live Telemetry
+              {isConnected ? 'Live Telemetry' : 'Awaiting ESP32'}
             </ThemedText>
           </View>
         </Animated.View>
@@ -651,29 +587,5 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     marginTop: 2,
     lineHeight: 16,
-  },
-  testRow: {
-    paddingTop: 10,
-    borderTopWidth: 1,
-    gap: 8,
-  },
-  testHeading: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  testButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  testBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  testBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
   },
 });
