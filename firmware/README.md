@@ -138,7 +138,7 @@ Perform these hardware checks before running the full system:
 
 ---
 
-## 🧪 System Testing Procedures
+## 🧪 System Testing 
 
 ### A. Manual Mode Testing
 1. In the mobile app, toggle mode to **Manual Mode** (or confirm mode pill shows "MANUAL MODE").
