@@ -123,7 +123,7 @@ HC-SR04 ECHO (5V) ────[ 1 kΩ ]────┬────→ ESP32 GPIO
 
 ---
 
-## 📋 Hardware Verification 
+## 📋 Hardware Verification Checklist
 
 Perform these hardware checks before running the full system:
 
