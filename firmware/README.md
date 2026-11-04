@@ -128,7 +128,7 @@ HC-SR04 ECHO (5V) ────[ 1 kΩ ]────┬────→ ESP32 GPIO
 Perform these hardware checks before running the full system:
 
 - [ ] **Power Supply Isolation**: Verify that the power source is strictly 5V DC (DO NOT connect AC mains!).
-- [ ] **Common Ground**: Ensure ESP32 GND, Relay module GND, Sensor GNDs, and 5V Power Supply GND are all tied t
+- [ ] **Common Ground**: Ensure ESP32 GND, Relay module GND, Sensor GNDs, and 5V Power Supply GND are all tied together.
 - [ ] **HC-SR04 Echo Divider**: Use a multimeter to verify voltage on GPIO 18 never exceeds 3.3V when the ultrasonic sensor is triggered.
 - [ ] **PIR Sensor Potentiometers**: Adjust the PIR time delay trimmer to minimum (fully counter-clockwise) so the PIR output goes LOW promptly when motion stops. Adjust sensitivity as needed.
 - [ ] **IR Sensor Potentiometer**: Turn the small blue trimmer on the IR sensor until the onboard indicator LED turns ON only when an obstacle is within 3–15 cm.
